@@ -11,14 +11,17 @@ bool configIsContinuousMode(); // Sprawdza, czy włączyć tryb ciągły
 uint8_t configGetSoilPin();
 int configGetSoilDryADC();
 int configGetSoilWetADC();
-int configGetSoilVccPin(); // Zwraca -1 jeśli nie używany
+int configGetSoilVccPin(); // Zwraca 255 (uint8_t max) lub -1 (int) w razie błędu/nieużywania
 
 // Funkcje dostępowe dla czujnika poziomu wody
-uint8_t configGetWaterLevelPin(int level); // Zwraca pin dla poziomu 1-5
+uint8_t configGetWaterLevelPin(int level); // Zwraca pin dla poziomu 1-5, lub 255 dla błędu
+
+// Funkcje dostępowe dla sterowania pompą
+uint8_t configGetPumpPin();
+uint32_t configGetPumpRunMillis();
+int configGetSoilThresholdPercent(); // Próg wilgotności do uruchomienia pompy
 
 // Funkcja dostępowa dla czasu uśpienia
 uint32_t configGetSleepSeconds();
-
-// W przyszłości dodaj tu gettery dla innych ustawień (MQTT, DHT itp.)
 
 #endif // DEVICECONFIG_H

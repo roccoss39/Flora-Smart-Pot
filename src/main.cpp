@@ -1,75 +1,71 @@
 #include <Arduino.h>
-#include "DeviceConfig.h"     // Zarządzanie konfiguracją
-#include "SoilSensor.h"       // Moduł czujnika wilgotności
-#include "WaterLevelSensor.h" // Moduł czujnika poziomu wody
-#include "PowerManager.h"     // Zarządzanie energią (Deep Sleep)
+#include "DeviceConfig.h"
+#include "SoilSensor.h"
+#include "WaterLevelSensor.h" // Używa stałej NUM_WATER_LEVELS z tego pliku
+#include "PowerManager.h"
+#include "PumpControl.h"
 
-// W przyszłości dodaj include dla innych modułów:
-// #include "DHTSensor.h"
+// Przyszłe include'y dla komunikacji
+// #include "WiFiManager.h"
 // #include "MQTTManager.h"
 
 void setup() {
     Serial.begin(115200);
-    // while (!Serial); // Odkomentuj, jeśli chcesz czekać na otwarcie monitora
     Serial.println("\n--- Flaura Smart Pot - Główny Start ---");
 
-    // 1. Wczytaj konfigurację (lub zapisz domyślną)
     configSetup();
 
-    // 2. Zainicjalizuj moduły/czujniki
     soilSensorSetup();
     waterLevelSensorSetup();
-    // W przyszłości:
-    // dhtSensorSetup();
-    // mqttManagerSetup();
+    pumpControlSetup();
+    // ... (Inicjalizacja innych modułów) ...
 
-    // 3. Wykonaj główną logikę cyklu (tylko jeśli NIE w trybie ciągłym)
     if (!configIsContinuousMode()) {
         Serial.println("Rozpoczynam cykl pomiarowy (Tryb Deep Sleep)...");
-
         int currentMoisture = soilSensorReadPercent();
         int currentWaterLevel = waterLevelSensorReadLevel();
-        // W przyszłości:
-        // float currentTemp = dhtSensorReadTemperature();
-        // float currentHumidity = dhtSensorReadHumidity();
 
         Serial.println("--- Wyniki pomiarów ---");
         Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture);
-        Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS); // Używamy stałej z WaterLevelSensor.h
-        // ... (wyświetlanie innych wyników) ...
+        Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
         Serial.println("-----------------------");
 
+        // Uruchom pompę jeśli potrzeba (tylko w trybie auto - do dodania)
+        pumpControlActivateIfNeeded(currentMoisture, currentWaterLevel);
 
-        // Tutaj miejsce na logikę wysyłania danych (np. MQTT)
-        // if (/* Połączono z WiFi/MQTT */) {
-        //    mqttManagerPublish(currentMoisture, currentWaterLevel, ...);
-        // }
+        // ... (Wysyłanie danych) ...
 
-        // Przejdź w Deep Sleep
         powerManagerGoToDeepSleep();
     } else {
-         Serial.println("Uruchomiono w trybie ciągłym. Pomiary będą wykonywane w pętli loop().");
+         Serial.println("Uruchomiono w trybie ciągłym. Pomiary/kontrola w pętli loop().");
+         Serial.println("Pamiętaj zmienić DEFAULT_CONTINUOUS_MODE na 'false' dla Deep Sleep!");
     }
 }
 
 void loop() {
-    // Kod w pętli loop() wykonuje się tylko w trybie ciągłym
+    // W przyszłości: obsługa komunikacji (odbieranie komend MQTT/BLE)
+    // handleCommunication();
+    // Przykład:
+    // if (receivedCommand == "PUMP_ON_MANUAL") { pumpControlManualTurnOn(configGetPumpRunMillis()); }
+    // if (receivedCommand == "PUMP_OFF_MANUAL") { pumpControlManualTurnOff(); }
+
     if (configIsContinuousMode()) {
-        delay(5000); // Odstęp między pomiarami w trybie ciągłym
-        Serial.println("\n--- Kolejny pomiar (tryb ciągły) ---");
+        delay(5000);
+        Serial.println("\n--- Kolejny pomiar/cykl (tryb ciągły) ---");
 
         int currentMoisture = soilSensorReadPercent();
         int currentWaterLevel = waterLevelSensorReadLevel();
-        // W przyszłości odczytaj inne czujniki...
 
         Serial.println("--- Wyniki pomiarów ---");
         Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture);
-        Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS); // Używamy stałej z WaterLevelSensor.h
-         // ... (wyświetlanie innych wyników) ...
-        Serial.println("-------------------------------------");
+        Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
+        Serial.println("-----------------------");
+
+        // Uruchom pompę jeśli potrzeba (tylko w trybie auto - do dodania)
+        pumpControlActivateIfNeeded(currentMoisture, currentWaterLevel);
+
     } else {
-        // W trybie Deep Sleep ta pętla jest praktycznie nieużywana.
-        // Można dodać tu np. miganie diodą co sekundę, aby pokazać, że ESP nieoczekiwanie tu trafił.
+        // W trybie Deep Sleep ta pętla nie powinna być często osiągana
         delay(1000);
     }
 }
