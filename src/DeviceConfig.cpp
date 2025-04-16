@@ -26,6 +26,9 @@ const char* PREF_SOIL_THRESHOLD = "soilThresh";
 const char* PREF_SLEEP_SEC = "sleepSec";
 const char* PREF_CONT_MODE = "contMode";
 
+//Baterry check
+const char* PREF_BAT_ADC_PIN = "batAdcPin";
+
 // --- Domyślne wartości konfiguracji ---
 // Czujnik wilgotności - Twoje wartości
 const uint8_t DEFAULT_SOIL_PIN = 34;
@@ -48,6 +51,9 @@ const int DEFAULT_SOIL_THRESHOLD = 30;   // Poniżej 30%
 const uint32_t DEFAULT_SLEEP_SECONDS = 3600;
 const bool DEFAULT_CONTINUOUS_MODE = true; // DO TESTÓW! Zmień na false dla Deep Sleep.
 
+//Baterry 
+const uint8_t DEFAULT_BAT_ADC_PIN = 35; // Pin ADC do pomiaru napięcia baterii
+
 // Zmienne statyczne przechowujące wczytaną konfigurację
 static uint8_t soilSensorPin;
 static int soilAdcDry;
@@ -59,6 +65,7 @@ static uint32_t pumpRunMillis;
 static int soilMoistureThreshold;
 static uint32_t sleepDurationSeconds;
 static bool continuousMode;
+static uint8_t batteryAdcPin;
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 // (Usuń warunek 'if', aby zawsze nadpisywać na czas testów/kalibracji)
@@ -77,6 +84,7 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putInt(PREF_SOIL_THRESHOLD, DEFAULT_SOIL_THRESHOLD);
         preferences.putUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS);
         preferences.putBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
+        preferences.putUChar(PREF_BAT_ADC_PIN, DEFAULT_BAT_ADC_PIN);
      }
 }
 
@@ -97,6 +105,7 @@ void configSetup() {
     soilMoistureThreshold = preferences.getInt(PREF_SOIL_THRESHOLD, DEFAULT_SOIL_THRESHOLD);
     sleepDurationSeconds = preferences.getUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS);
     continuousMode = preferences.getBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
+    batteryAdcPin = preferences.getUChar(PREF_BAT_ADC_PIN, DEFAULT_BAT_ADC_PIN);
 
     preferences.end();
 
@@ -114,6 +123,7 @@ void configSetup() {
     Serial.printf("  Pin pompy: %d\n", pumpPin);
     Serial.printf("  Czas pracy pompy: %d ms\n", pumpRunMillis);
     Serial.printf("  Próg wilgotności dla pompy: %d %%\n", soilMoistureThreshold);
+    Serial.printf("  Pin ADC baterii: %d\n", batteryAdcPin);
     Serial.printf("  Czas uśpienia: %d s\n", sleepDurationSeconds);
     Serial.println("--------------------");
 
@@ -141,3 +151,5 @@ uint8_t configGetWaterLevelPin(int level) {
     }
     return 255; // Zwróć nieprawidłowy numer pinu (uint8_t max)
 }
+
+uint8_t configGetBatteryAdcPin() { return batteryAdcPin; }

@@ -16,6 +16,8 @@ int configGetSoilVccPin(); // Zwraca 255 (uint8_t max) lub -1 (int) w razie bł�
 // Funkcje dostępowe dla czujnika poziomu wody
 uint8_t configGetWaterLevelPin(int level); // Zwraca pin dla poziomu 1-5, lub 255 dla błędu
 
+uint8_t configGetBatteryAdcPin(); // Zwraca pin ADC do pomiaru baterii
+
 // Funkcje dostępowe dla sterowania pompą
 uint8_t configGetPumpPin();
 uint32_t configGetPumpRunMillis();

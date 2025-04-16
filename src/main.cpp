@@ -4,6 +4,7 @@
 #include "WaterLevelSensor.h" // Używa stałej NUM_WATER_LEVELS z tego pliku
 #include "PowerManager.h"
 #include "PumpControl.h"
+#include "BatteryMonitor.h"
 
 // Przyszłe include'y dla komunikacji
 // #include "WiFiManager.h"
@@ -18,6 +19,7 @@ void setup() {
     soilSensorSetup();
     waterLevelSensorSetup();
     pumpControlSetup();
+    batteryMonitorSetup();
     // ... (Inicjalizacja innych modułów) ...
 
     if (!configIsContinuousMode()) {
@@ -55,10 +57,12 @@ void loop() {
 
         int currentMoisture = soilSensorReadPercent();
         int currentWaterLevel = waterLevelSensorReadLevel();
+        float currentBatteryVoltage = batteryMonitorReadVoltage();
 
         Serial.println("--- Wyniki pomiarów ---");
         Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture);
         Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
+        Serial.printf("Napięcie baterii: %.2f V\n", currentBatteryVoltage); // TODO: DODAC DO DEEP SLEEP
         Serial.println("-----------------------");
 
         // Uruchom pompę jeśli potrzeba (tylko w trybie auto - do dodania)
