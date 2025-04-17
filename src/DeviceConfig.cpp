@@ -6,53 +6,43 @@ Preferences preferences;
 // Twoja przestrzeń nazw:
 const char* PREF_NAMESPACE = "flaura_cfg_1";
 
-#define NUM_WATER_LEVELS_CONFIG 5 // Liczba poziomów wody do skonfigurowania
+#define NUM_WATER_LEVELS_CONFIG 5 // Liczba poziomów wody
 
 // --- Klucze dla Preferences ---
-// Czujnik wilgotności
 const char* PREF_SOIL_PIN = "soilPin";
 const char* PREF_SOIL_DRY = "soilDry";
 const char* PREF_SOIL_WET = "soilWet";
-const char* PREF_SOIL_VCC = "soilVccPin";
-// Czujnik poziomu wody (L1-L5)
-const char* PREF_WL_PIN[NUM_WATER_LEVELS_CONFIG] = {
-    "wlPin1", "wlPin2", "wlPin3", "wlPin4", "wlPin5"
-};
-// Pompka
+const char* PREF_SOIL_VCC = "soilVccPin"; // Klucz dla pinu VCC czujnika wilgotności
+const char* PREF_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { "wlPin1", "wlPin2", "wlPin3", "wlPin4", "wlPin5" };
 const char* PREF_PUMP_PIN = "pumpPin";
 const char* PREF_PUMP_RUN_MS = "pumpMs";
 const char* PREF_SOIL_THRESHOLD = "soilThresh";
-// Ustawienia ogólne
+const char* PREF_BAT_ADC_PIN = "batAdcPin";
+const char* PREF_DHT_PIN = "dhtPin";      // Klucz dla pinu DATA czujnika DHT
+// Nie dodajemy na razie klucza dla VCC DHT: const char* PREF_DHT_VCC_PIN = "dhtVccPin";
 const char* PREF_SLEEP_SEC = "sleepSec";
 const char* PREF_CONT_MODE = "contMode";
 
-//Baterry check
-const char* PREF_BAT_ADC_PIN = "batAdcPin";
-
 // --- Domyślne wartości konfiguracji ---
-// Czujnik wilgotności - Twoje wartości
+// Soil Sensor - Twoje wartości, z kontrolą VCC
 const uint8_t DEFAULT_SOIL_PIN = 34;
 const int DEFAULT_SOIL_DRY = 2755;
 const int DEFAULT_SOIL_WET = 930;
-const int DEFAULT_SOIL_VCC_PIN = 26; // Używamy pinu 26
-// Czujnik poziomu wody (L1-L5) - Twoja kolejność pinów
-const uint8_t DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = {
-    19, // Pin dla poziomu 1 (najniższy)
-    18, // Pin dla poziomu 2
-    5,  // Pin dla poziomu 3
-    17, // Pin dla poziomu 4
-    16  // Pin dla poziomu 5 (najwyższy)
-};
-// Pompka
+const int DEFAULT_SOIL_VCC_PIN = 26; // Używamy GPIO 26 do włączania/wyłączania
+// Water Level Sensor - Twoja kolejność pinów
+const uint8_t DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { 19, 18, 5, 17, 16 };
+// Pump
 const uint8_t DEFAULT_PUMP_PIN = 25;
-const uint32_t DEFAULT_PUMP_RUN_MS = 3000; // 3 sekundy
-const int DEFAULT_SOIL_THRESHOLD = 30;   // Poniżej 30%
-// Ustawienia ogólne
+const uint32_t DEFAULT_PUMP_RUN_MS = 3000;
+const int DEFAULT_SOIL_THRESHOLD = 30;
+// Battery Monitor
+const uint8_t DEFAULT_BAT_ADC_PIN = 35;
+// DHT Sensor
+const uint8_t DEFAULT_DHT_PIN = 4;
+// Nie dodajemy na razie domyślnego pinu VCC dla DHT: const int DEFAULT_DHT_VCC_PIN = -1;
+// General
 const uint32_t DEFAULT_SLEEP_SECONDS = 3600;
 const bool DEFAULT_CONTINUOUS_MODE = true; // DO TESTÓW! Zmień na false dla Deep Sleep.
-
-//Baterry 
-const uint8_t DEFAULT_BAT_ADC_PIN = 35; // Pin ADC do pomiaru napięcia baterii
 
 // Zmienne statyczne przechowujące wczytaną konfigurację
 static uint8_t soilSensorPin;
@@ -63,28 +53,31 @@ static uint8_t waterLevelPins[NUM_WATER_LEVELS_CONFIG];
 static uint8_t pumpPin;
 static uint32_t pumpRunMillis;
 static int soilMoistureThreshold;
+static uint8_t batteryAdcPin;
+static uint8_t dhtPin;
+// static int dhtVccPin; // Na razie nieużywane
 static uint32_t sleepDurationSeconds;
 static bool continuousMode;
-static uint8_t batteryAdcPin;
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
-// (Usuń warunek 'if', aby zawsze nadpisywać na czas testów/kalibracji)
 void saveDefaultConfigurationIfNeeded() {
      if (!preferences.isKey(PREF_SLEEP_SEC)) {
         Serial.println("Zapisuję wartości domyślne z kodu...");
         preferences.putUChar(PREF_SOIL_PIN, DEFAULT_SOIL_PIN);
         preferences.putInt(PREF_SOIL_DRY, DEFAULT_SOIL_DRY);
         preferences.putInt(PREF_SOIL_WET, DEFAULT_SOIL_WET);
-        preferences.putInt(PREF_SOIL_VCC, DEFAULT_SOIL_VCC_PIN);
+        preferences.putInt(PREF_SOIL_VCC, DEFAULT_SOIL_VCC_PIN); // Zapisuje pin VCC gleby
         for (int i = 0; i < NUM_WATER_LEVELS_CONFIG; i++) {
             preferences.putUChar(PREF_WL_PIN[i], DEFAULT_WL_PIN[i]);
         }
         preferences.putUChar(PREF_PUMP_PIN, DEFAULT_PUMP_PIN);
         preferences.putUInt(PREF_PUMP_RUN_MS, DEFAULT_PUMP_RUN_MS);
         preferences.putInt(PREF_SOIL_THRESHOLD, DEFAULT_SOIL_THRESHOLD);
+        preferences.putUChar(PREF_BAT_ADC_PIN, DEFAULT_BAT_ADC_PIN);
+        preferences.putUChar(PREF_DHT_PIN, DEFAULT_DHT_PIN);
+        // preferences.putInt(PREF_DHT_VCC_PIN, DEFAULT_DHT_VCC_PIN); // Na razie nie zapisujemy
         preferences.putUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS);
         preferences.putBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
-        preferences.putUChar(PREF_BAT_ADC_PIN, DEFAULT_BAT_ADC_PIN);
      }
 }
 
@@ -96,16 +89,18 @@ void configSetup() {
     soilSensorPin = preferences.getUChar(PREF_SOIL_PIN, DEFAULT_SOIL_PIN);
     soilAdcDry = preferences.getInt(PREF_SOIL_DRY, DEFAULT_SOIL_DRY);
     soilAdcWet = preferences.getInt(PREF_SOIL_WET, DEFAULT_SOIL_WET);
-    soilVccPin = preferences.getInt(PREF_SOIL_VCC, DEFAULT_SOIL_VCC_PIN);
+    soilVccPin = preferences.getInt(PREF_SOIL_VCC, DEFAULT_SOIL_VCC_PIN); // Wczytuje pin VCC gleby
     for (int i = 0; i < NUM_WATER_LEVELS_CONFIG; i++) {
         waterLevelPins[i] = preferences.getUChar(PREF_WL_PIN[i], DEFAULT_WL_PIN[i]);
     }
     pumpPin = preferences.getUChar(PREF_PUMP_PIN, DEFAULT_PUMP_PIN);
     pumpRunMillis = preferences.getUInt(PREF_PUMP_RUN_MS, DEFAULT_PUMP_RUN_MS);
     soilMoistureThreshold = preferences.getInt(PREF_SOIL_THRESHOLD, DEFAULT_SOIL_THRESHOLD);
+    batteryAdcPin = preferences.getUChar(PREF_BAT_ADC_PIN, DEFAULT_BAT_ADC_PIN);
+    dhtPin = preferences.getUChar(PREF_DHT_PIN, DEFAULT_DHT_PIN);
+    // dhtVccPin = preferences.getInt(PREF_DHT_VCC_PIN, DEFAULT_DHT_VCC_PIN); // Na razie nie wczytujemy
     sleepDurationSeconds = preferences.getUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS);
     continuousMode = preferences.getBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
-    batteryAdcPin = preferences.getUChar(PREF_BAT_ADC_PIN, DEFAULT_BAT_ADC_PIN);
 
     preferences.end();
 
@@ -124,32 +119,34 @@ void configSetup() {
     Serial.printf("  Czas pracy pompy: %d ms\n", pumpRunMillis);
     Serial.printf("  Próg wilgotności dla pompy: %d %%\n", soilMoistureThreshold);
     Serial.printf("  Pin ADC baterii: %d\n", batteryAdcPin);
+    Serial.printf("  Pin DHT11: %d\n", dhtPin);
     Serial.printf("  Czas uśpienia: %d s\n", sleepDurationSeconds);
     Serial.println("--------------------");
 
-    // Konfiguracja pinu VCC dla soil (jeśli używany)
-    if (soilVccPin != -1 && soilVccPin != 255) {
-        pinMode(soilVccPin, OUTPUT);
-        digitalWrite(soilVccPin, LOW);
-    }
+    // Konfiguracja pinu VCC dla soil (jeśli używany) - przeniesione do SoilSensor.cpp
+    // if (soilVccPin != -1 && soilVccPin < GPIO_NUM_MAX) {
+    //    pinMode(soilVccPin, OUTPUT);
+    //    digitalWrite(soilVccPin, LOW);
+    // }
 }
 
-// Gettery
+// Gettery - dodany getter dla DHT_PIN
 bool configIsContinuousMode() { return continuousMode; }
 uint8_t configGetSoilPin() { return soilSensorPin; }
 int configGetSoilDryADC() { return soilAdcDry; }
 int configGetSoilWetADC() { return soilAdcWet; }
-int configGetSoilVccPin() { return soilVccPin; } // Zwraca int, -1 jeśli nie zdefiniowano
+int configGetSoilVccPin() { return soilVccPin; }
 uint32_t configGetSleepSeconds() { return sleepDurationSeconds; }
 uint8_t configGetPumpPin() { return pumpPin; }
 uint32_t configGetPumpRunMillis() { return pumpRunMillis; }
 int configGetSoilThresholdPercent() { return soilMoistureThreshold; }
+uint8_t configGetBatteryAdcPin() { return batteryAdcPin; }
+uint8_t configGetDhtPin() { return dhtPin; } // Getter dla pinu DHT
+// uint8_t configGetDhtVccPin() { return dhtVccPin; } // Na razie nieużywane
 
 uint8_t configGetWaterLevelPin(int level) {
     if (level >= 1 && level <= NUM_WATER_LEVELS_CONFIG) {
         return waterLevelPins[level - 1];
     }
-    return 255; // Zwróć nieprawidłowy numer pinu (uint8_t max)
+    return 255;
 }
-
-uint8_t configGetBatteryAdcPin() { return batteryAdcPin; }

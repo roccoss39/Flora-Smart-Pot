@@ -5,6 +5,8 @@
 #include "PowerManager.h"
 #include "PumpControl.h"
 #include "BatteryMonitor.h"
+#include "EnvironmentSensor.h"
+
 
 // Przyszłe include'y dla komunikacji
 // #include "WiFiManager.h"
@@ -20,6 +22,7 @@ void setup() {
     waterLevelSensorSetup();
     pumpControlSetup();
     batteryMonitorSetup();
+    environmentSensorSetup();
     // ... (Inicjalizacja innych modułów) ...
 
     if (!configIsContinuousMode()) {
@@ -55,6 +58,10 @@ void loop() {
         delay(5000);
         Serial.println("\n--- Kolejny pomiar/cykl (tryb ciągły) ---");
 
+        float currentTemperature;
+        float currentHumidity;
+        bool dhtOk = environmentSensorRead(currentTemperature, currentHumidity); // Odczytaj Temp/Wilg
+
         int currentMoisture = soilSensorReadPercent();
         int currentWaterLevel = waterLevelSensorReadLevel();
         float currentBatteryVoltage = batteryMonitorReadVoltage();
@@ -63,6 +70,14 @@ void loop() {
         Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture);
         Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
         Serial.printf("Napięcie baterii: %.2f V\n", currentBatteryVoltage); // TODO: DODAC DO DEEP SLEEP
+        if (dhtOk) { // Wyświetl tylko jeśli odczyt był poprawny
+            Serial.printf("Temperatura: %.1f C\n", currentTemperature);
+            Serial.printf("Wilgotność powietrza: %.1f %%\n", currentHumidity);
+         } else {
+            Serial.println("Temperatura: Błąd odczytu");
+            Serial.println("Wilgotność powietrza: Błąd odczytu");
+         }
+
         Serial.println("-----------------------");
 
         // Uruchom pompę jeśli potrzeba (tylko w trybie auto - do dodania)

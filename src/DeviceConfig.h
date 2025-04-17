@@ -18,6 +18,8 @@ uint8_t configGetWaterLevelPin(int level); // Zwraca pin dla poziomu 1-5, lub 25
 
 uint8_t configGetBatteryAdcPin(); // Zwraca pin ADC do pomiaru baterii
 
+uint8_t configGetDhtPin();
+
 // Funkcje dostępowe dla sterowania pompą
 uint8_t configGetPumpPin();
 uint32_t configGetPumpRunMillis();
