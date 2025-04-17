@@ -5,8 +5,8 @@
 static uint8_t adcPin;
 
 // Parametry dzielnika napięcia (zgodnie ze schematem Flaura)
-const float R1_VALUE = 100000.0; // Rezystor do GND
-const float R4_VALUE = 33000.0;  // Rezystor do V_BAT
+const float R1_VALUE = 99700.0; // Rezystor do GND
+const float R4_VALUE = 33020.0;  // Rezystor do V_BAT
 // Współczynnik, przez który mnożymy napięcie zmierzone na pinie ADC, aby dostać V_BAT
 const float VOLTAGE_MULTIPLIER = (R1_VALUE + R4_VALUE) / R1_VALUE; // ≈ 1.33
 
@@ -31,19 +31,21 @@ int batteryMonitorReadRawADC() {
 }
 
 float batteryMonitorReadVoltage() {
-    if (adcPin == 255) return 0.0; // Zwróć 0V jeśli pin nie jest skonfigurowany
+    if (adcPin == 255) return 0.0;
 
-    // Odczytaj surową wartość ADC (można dodać uśrednianie dla stabilności)
-    int rawAdc = analogRead(adcPin);
+    int numReadings = 10; // Liczba odczytów do uśrednienia
+    uint32_t totalRawAdc = 0;
+    for (int i = 0; i < numReadings; i++) {
+        totalRawAdc += analogRead(adcPin);
+        delay(1); // Mała pauza między odczytami
+    }
+    int rawAdc = totalRawAdc / numReadings; // Uśredniona wartość ADC
 
-    // Przelicz wartość ADC na napięcie zmierzone na pinie ESP32
-    // Uwaga: dla dokładnych pomiarów może być potrzebna kalibracja ADC ESP32!
+    // Reszta obliczeń jak poprzednio...
     float vAdc = (float)rawAdc * (ADC_VREF / ADC_MAX_VALUE);
-
-    // Przelicz napięcie z pinu ADC na rzeczywiste napięcie baterii używając dzielnika
     float vBat = vAdc * VOLTAGE_MULTIPLIER;
 
-    Serial.printf("  [Bateria] Odczyt ADC=%d -> V_adc=%.2fV -> V_BAT=%.2fV\n", rawAdc, vAdc, vBat);
+    Serial.printf("  [Bateria] Odczyt ADC(avg)=%d -> V_adc=%.2fV -> V_BAT=%.2fV\n", rawAdc, vAdc, vBat);
 
     return vBat;
 }
