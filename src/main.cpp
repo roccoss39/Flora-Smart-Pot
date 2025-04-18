@@ -1,214 +1,121 @@
-/*
 #include <Arduino.h>
-#include "DeviceConfig.h"
-#include "SoilSensor.h"
-#include "WaterLevelSensor.h" // Używa stałej NUM_WATER_LEVELS z tego pliku
-#include "PowerManager.h"
-#include "PumpControl.h"
-#include "BatteryMonitor.h"
-#include "EnvironmentSensor.h"
-#include "MotionSensor.h"
-#include <Wire.h> // Potrzebne dla I2C
-#include <Adafruit_Sensor.h>
+#include <Wire.h>
 
-// Przyszłe include'y dla komunikacji
-// #include "WiFiManager.h"
-// #include "MQTTManager.h"
+// === Konfiguracja Pinów i Adresu ===
+const int SDA_PIN = 21; // Domyślny SDA dla ESP32
+const int SCL_PIN = 22; // Domyślny SCL dla ESP32
+const int MPU_ADDR = 0x68; // Adres I2C czujnika (AD0 = LOW)
+
+// === Adresy Rejestrów MPU-6050 / MPU-6500 ===
+const int PWR_MGMT_1   = 0x6B; // Rejestr Zarządzania Energią 1
+const int ACCEL_XOUT_H = 0x3B; // Rejestr początkowy danych Akcelerometru (6 bajtów od tego adresu)
+const int GYRO_XOUT_H  = 0x43; // Rejestr początkowy danych Żyroskopu (6 bajtów od tego adresu)
+// const int TEMP_OUT_H   = 0x41; // Rejestr początkowy danych Temperatury (2 bajty) - opcjonalnie
+
+// === Zmienne Globalne na Surowe Dane ===
+int16_t rawAccX, rawAccY, rawAccZ; // 16-bitowe wartości ze znakiem
+int16_t rawGyroX, rawGyroY, rawGyroZ;
 
 void setup() {
-    Serial.begin(115200);
-    Serial.println("\n--- Flaura Smart Pot - Główny Start ---");
-    Wire.begin();
+  // Inicjalizacja Portu Szeregowego
+  Serial.begin(115200); // Użyj tej prędkości w monitorze szeregowym
+  while (!Serial) {
+    delay(10); // Czekaj na połączenie
+  }
+  Serial.println("\n--- MPU Raw Data Reader (Wire.h only) for ESP32 ---");
 
-    configSetup();
+  // Inicjalizacja Magistrali I2C z pinami ESP32
+  Wire.begin(SDA_PIN, SCL_PIN);
+  // Opcjonalnie ustaw wyższą prędkość zegara I2C (standard to 100kHz)
+  // Wire.setClock(400000); // 400kHz
 
-    soilSensorSetup();
-    waterLevelSensorSetup();
-    pumpControlSetup();
-    batteryMonitorSetup();
-    environmentSensorSetup();
-    motionSensorSetup(); 
+  Serial.println("Initializing I2C communication...");
 
-    // ... (Inicjalizacja innych modułów) ...
+  // Krok 1: Obudź czujnik MPU
+  Wire.beginTransmission(MPU_ADDR);   // Zacznij transmisję do MPU (0x68)
+  Wire.write(PWR_MGMT_1);           // Wskaż rejestr PWR_MGMT_1 (0x6B)
+  Wire.write(0);                    // Zapisz wartość 0x00, aby wyłączyć tryb uśpienia
+  byte status = Wire.endTransmission(true); // Zakończ transmisję
 
-    if (!configIsContinuousMode()) {
-        Serial.println("Rozpoczynam cykl pomiarowy (Tryb Deep Sleep)...");
-        int currentMoisture = soilSensorReadPercent();
-        int currentWaterLevel = waterLevelSensorReadLevel();
-
-        Serial.println("--- Wyniki pomiarów ---");
-        Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture);
-        Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
-        Serial.println("-----------------------");
-
-        // Uruchom pompę jeśli potrzeba (tylko w trybie auto - do dodania)
-        pumpControlActivateIfNeeded(currentMoisture, currentWaterLevel);
-
-        // ... (Wysyłanie danych) ...
-
-        powerManagerGoToDeepSleep();
-    } else {
-         Serial.println("Uruchomiono w trybie ciągłym. Pomiary/kontrola w pętli loop().");
-         Serial.println("Pamiętaj zmienić DEFAULT_CONTINUOUS_MODE na 'false' dla Deep Sleep!");
-    }
+  // Sprawdź status operacji budzenia
+  if (status == 0) {
+    Serial.println("MPU wake-up successful!");
+  } else {
+    Serial.print("MPU wake-up failed! Wire.endTransmission error code: ");
+    Serial.println(status);
+    Serial.println("Check wiring (SDA->21, SCL->22, VCC->3.3V!, GND->GND) and I2C address.");
+    Serial.println("Halting execution.");
+    while (1) { delay(100); } // Zatrzymaj program
+  }
+  Serial.println("----------------------------------------------------");
+  Serial.println("Reading Raw Sensor Data...");
+  Serial.println("Format: AccX  AccY  AccZ  |  GyroX  GyroY  GyroZ");
+  Serial.println("----------------------------------------------------");
+  delay(500); // Krótka pauza przed pętlą główną
 }
 
 void loop() {
-    // W przyszłości: obsługa komunikacji (odbieranie komend MQTT/BLE)
-    // handleCommunication();
-    // Przykład:
-    // if (receivedCommand == "PUMP_ON_MANUAL") { pumpControlManualTurnOn(configGetPumpRunMillis()); }
-    // if (receivedCommand == "PUMP_OFF_MANUAL") { pumpControlManualTurnOff(); }
+  bool readError = false;
 
-    if (configIsContinuousMode()) {
-        delay(5000);
-        Serial.println("\n--- Kolejny pomiar/cykl (tryb ciągły) ---");
+  // --- Odczyt Danych Akcelerometru ---
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(ACCEL_XOUT_H); // Ustaw wskaźnik na początek danych akcelerometru (0x3B)
+  byte status_acc_ptr = Wire.endTransmission(false); // Wyślij restart (nie kończ sesji)
 
-        float currentTemperature;
-        float currentHumidity;
-        bool dhtOk = environmentSensorRead(currentTemperature, currentHumidity); // Odczytaj Temp/Wilg
+  if (status_acc_ptr != 0) {
+     Serial.print("I2C Error setting Accel pointer: "); Serial.println(status_acc_ptr);
+     readError = true;
+  } else {
+     byte bytes_read_accel = Wire.requestFrom(MPU_ADDR, 6, true); // Poproś o 6 bajtów (AccX H/L, AccY H/L, AccZ H/L)
+     if (bytes_read_accel == 6) {
+       // Odczytaj i połącz bajty (starszy bajt << 8 | młodszy bajt)
+       rawAccX = (int16_t)(Wire.read() << 8 | Wire.read());
+       rawAccY = (int16_t)(Wire.read() << 8 | Wire.read());
+       rawAccZ = (int16_t)(Wire.read() << 8 | Wire.read());
+     } else {
+       Serial.print("I2C Error reading Accel data, bytes read: "); Serial.println(bytes_read_accel);
+       readError = true;
+     }
+  }
 
-        int currentMoisture = soilSensorReadPercent();
-        int currentWaterLevel = waterLevelSensorReadLevel();
-        float currentBatteryVoltage = batteryMonitorReadVoltage();
+  // --- Odczyt Danych Żyroskopu ---
+  // (Tylko jeśli odczyt akcelerometru nie napotkał błędu wskaźnika,
+  //  chociaż błąd odczytu mógł wystąpić)
+  if (!readError) {
+      Wire.beginTransmission(MPU_ADDR);
+      Wire.write(GYRO_XOUT_H); // Ustaw wskaźnik na początek danych żyroskopu (0x43)
+      byte status_gyro_ptr = Wire.endTransmission(false); // Wyślij restart
 
-        float ax, ay, az, gx, gy, gz;
-        bool mpuOk = motionSensorReadRaw(ax, ay, az, gx, gy, gz);
-
-        Serial.println("--- Wyniki pomiarów ---");
-        Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture);
-        Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
-        Serial.printf("Napięcie baterii: %.2f V\n", currentBatteryVoltage); // TODO: DODAC DO DEEP SLEEP
-        if (dhtOk) { // Wyświetl tylko jeśli odczyt był poprawny
-            Serial.printf("Temperatura: %.1f C\n", currentTemperature);
-            Serial.printf("Wilgotność powietrza: %.1f %%\n", currentHumidity);
+      if (status_gyro_ptr != 0) {
+         Serial.print("I2C Error setting Gyro pointer: "); Serial.println(status_gyro_ptr);
+         readError = true;
+      } else {
+         byte bytes_read_gyro = Wire.requestFrom(MPU_ADDR, 6, true); // Poproś o 6 bajtów (GyroX H/L, GyroY H/L, GyroZ H/L)
+         if (bytes_read_gyro == 6) {
+           // Odczytaj i połącz bajty
+           rawGyroX = (int16_t)(Wire.read() << 8 | Wire.read());
+           rawGyroY = (int16_t)(Wire.read() << 8 | Wire.read());
+           rawGyroZ = (int16_t)(Wire.read() << 8 | Wire.read());
          } else {
-            Serial.println("Temperatura: Błąd odczytu");
-            Serial.println("Wilgotność powietrza: Błąd odczytu");
+           Serial.print("I2C Error reading Gyro data, bytes read: "); Serial.println(bytes_read_gyro);
+           readError = true;
          }
-
-         if (mpuOk) {
-            float tiltAngle = motionSensorCalculateTiltAngleZ(ax, ay, az);
-            Serial.printf("MPU6050 Accel (X,Y,Z): %.2f, %.2f, %.2f m/s^2\n", ax, ay, az);
-            Serial.printf("MPU6050 Gyro  (X,Y,Z): %.2f, %.2f, %.2f rad/s\n", gx, gy, gz);
-            Serial.printf("Obliczony kąt przechyłu (vs pion): %.1f stopni\n", tiltAngle);
-    
-            // Prosta logika wykrywania przechyłu
-            const float TILT_THRESHOLD_DEGREES = 45.0; // Próg przechyłu w stopniach
-            if (abs(tiltAngle) > TILT_THRESHOLD_DEGREES) {
-                Serial.println("!!! ALERT: Doniczka znacznie przechylona lub przewrócona! Zatrzymuję pompę.");
-                // Wywołaj funkcję natychmiastowego zatrzymania pompy
-                pumpControlManualTurnOff();
-                // Tutaj można dodać wysyłanie alertu MQTT/Blynk itp.
-            }
-    
-        } else {
-             Serial.println("MPU6050: Błąd odczytu danych.");
-        }
-
-        Serial.println("-----------------------");
-
-        // Uruchom pompę jeśli potrzeba (tylko w trybie auto - do dodania)
-        pumpControlActivateIfNeeded(currentMoisture, currentWaterLevel);
-
-    } else {
-        // W trybie Deep Sleep ta pętla nie powinna być często osiągana
-        delay(1000);
-    }
-}
-
-*/
-
-/*
-#include <Arduino.h>
-#include <Wire.h>
-
-void setup() {
-  Wire.begin(); // Uruchom I2C (domyślne piny 21, 22)
-  Serial.begin(115200);
-  while (!Serial); // Poczekaj na monitor
-  Serial.println("\n--- Skaner I2C ---");
-}
-
-void loop() {
-  byte error, address;
-  int nDevices;
-
-  Serial.println("Skanowanie...");
-  nDevices = 0;
-  for(address = 1; address < 127; address++ ) {
-    // Wire.requestFrom() zwraca 0 jeśli urządzenie nie odpowiedziało
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
-
-    if (error == 0) { // Sukces - urządzenie odpowiedziało
-      Serial.print("Znaleziono urządzenie I2C pod adresem 0x");
-      if (address < 16)
-        Serial.print("0");
-      Serial.print(address, HEX);
-      Serial.println("  !");
-      nDevices++;
-    }
-    else if (error == 4) { // Inny błąd (np. problem z połączeniem)
-      Serial.print("Nieznany błąd przy adresie 0x");
-      if (address < 16)
-        Serial.print("0");
-      Serial.println(address, HEX);
-    }
+      }
   }
-  if (nDevices == 0)
-    Serial.println("Nie znaleziono żadnych urządzeń I2C.\n");
-  else
-    Serial.println("Skanowanie zakończone.\n");
 
-  delay(5000); // Poczekaj 5 sekund przed kolejnym skanowaniem
-}
-
-*/
-
-#include <Arduino.h>
-#include <Wire.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
-
-Adafruit_MPU6050 mpu;
-
-void setup() {
-  Serial.begin(115200);
-  while (!Serial);
-  Serial.println("Minimalny Test MPU-6050");
-
-  Wire.begin(); // Uruchom I2C
-
-  // Spróbuj zainicjować MPU na domyślnym adresie 0x68
-  if (!mpu.begin()) {
-    Serial.println("BŁĄD KRYTYCZNY: Nie można zainicjować MPU-6050! Sprawdź połączenia.");
-    while (1) { // Zatrzymaj program
-      delay(10);
-    }
+  // --- Wyświetl Surowe Dane (jeśli nie było błędów I2C) ---
+  if (!readError) {
+      Serial.print(rawAccX); Serial.print("\t"); // Użyj tabulatora jako separatora
+      Serial.print(rawAccY); Serial.print("\t");
+      Serial.print(rawAccZ); Serial.print("\t|\t");
+      Serial.print(rawGyroX); Serial.print("\t");
+      Serial.print(rawGyroY); Serial.print("\t");
+      Serial.println(rawGyroZ);
+  } else {
+      Serial.println("Skipping print due to read error.");
+      // Zeruj wartości w razie błędu, aby uniknąć używania starych danych
+      rawAccX=0; rawAccY=0; rawAccZ=0; rawGyroX=0; rawGyroY=0; rawGyroZ=0;
   }
-  Serial.println("MPU-6050 zainicjalizowany pomyślnie.");
 
-  // Ustaw zakresy (opcjonalnie)
-  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-}
-
-void loop() {
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp); // Odczytaj dane
-
-  Serial.print("Akcelerometr - X: "); Serial.print(a.acceleration.x);
-  Serial.print(" Y: "); Serial.print(a.acceleration.y);
-  Serial.print(" Z: "); Serial.print(a.acceleration.z);
-  Serial.println(" m/s^2");
-
-  Serial.print("Żyroskop - X: "); Serial.print(g.gyro.x);
-  Serial.print(" Y: "); Serial.print(g.gyro.y);
-  Serial.print(" Z: "); Serial.print(g.gyro.z);
-  Serial.println(" rad/s");
-
-  Serial.println("");
-  delay(500); // Odczytuj co pół sekundy
+  delay(150); // Opóźnienie między cyklami odczytu
 }
