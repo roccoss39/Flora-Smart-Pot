@@ -2,120 +2,134 @@
 #include <Wire.h>
 
 // === Konfiguracja Pinów i Adresu ===
-const int SDA_PIN = 21; // Domyślny SDA dla ESP32
-const int SCL_PIN = 22; // Domyślny SCL dla ESP32
-const int MPU_ADDR = 0x68; // Adres I2C czujnika (AD0 = LOW)
+const int SDA_PIN = 21;
+const int SCL_PIN = 22;
+const int MPU_ADDR = 0x68;
 
-// === Adresy Rejestrów MPU-6050 / MPU-6500 ===
-const int PWR_MGMT_1   = 0x6B; // Rejestr Zarządzania Energią 1
-const int ACCEL_XOUT_H = 0x3B; // Rejestr początkowy danych Akcelerometru (6 bajtów od tego adresu)
-const int GYRO_XOUT_H  = 0x43; // Rejestr początkowy danych Żyroskopu (6 bajtów od tego adresu)
-// const int TEMP_OUT_H   = 0x41; // Rejestr początkowy danych Temperatury (2 bajty) - opcjonalnie
+// === Adresy Rejestrów ===
+const int PWR_MGMT_1   = 0x6B;
+const int ACCEL_XOUT_H = 0x3B;
+const int GYRO_XOUT_H  = 0x43;
 
-// === Zmienne Globalne na Surowe Dane ===
-int16_t rawAccX, rawAccY, rawAccZ; // 16-bitowe wartości ze znakiem
+// === Współczynniki Skalowania ===
+const float ACCEL_SCALE_FACTOR_G = 16384.0; // LSB/g
+const float GYRO_SCALE_FACTOR_DPS = 131.0;  // LSB/(deg/s)
+
+// === OBLICZONE BIASY (z Twoich danych "w spoczynku") ===
+// Zaokrąglone dla czytelności
+const float accX_bias = -0.132;
+const float accY_bias = -0.025;
+const float accZ_bias = 1.031; // Średnia wartość Z w spoczynku (bliska 1g)
+const float gyroX_bias = 0.019;
+const float gyroY_bias = 2.297; // Znaczący bias!
+const float gyroZ_bias = 0.326;
+
+// === Zmienne Globalne ===
+int16_t rawAccX, rawAccY, rawAccZ;
 int16_t rawGyroX, rawGyroY, rawGyroZ;
+float accX_g, accY_g, accZ_g;
+float gyroX_dps, gyroY_dps, gyroZ_dps;
+// Dodane zmienne na skalibrowane wartości
+float calAccX_g, calAccY_g, calAccZ_g;
+float calGyroX_dps, calGyroY_dps, calGyroZ_dps;
 
 void setup() {
-  // Inicjalizacja Portu Szeregowego
-  Serial.begin(115200); // Użyj tej prędkości w monitorze szeregowym
-  while (!Serial) {
-    delay(10); // Czekaj na połączenie
-  }
-  Serial.println("\n--- MPU Raw Data Reader (Wire.h only) for ESP32 ---");
+  Serial.begin(115200);
+  while (!Serial);
+  Serial.println("\n--- MPU Calibrated Data Reader (Wire.h only) for ESP32 ---");
 
-  // Inicjalizacja Magistrali I2C z pinami ESP32
   Wire.begin(SDA_PIN, SCL_PIN);
-  // Opcjonalnie ustaw wyższą prędkość zegara I2C (standard to 100kHz)
-  // Wire.setClock(400000); // 400kHz
+  // Wire.setClock(400000);
 
-  Serial.println("Initializing I2C communication...");
+  Serial.println("Initializing I2C and waking up MPU...");
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(PWR_MGMT_1);
+  Wire.write(0);
+  byte status = Wire.endTransmission(true);
 
-  // Krok 1: Obudź czujnik MPU
-  Wire.beginTransmission(MPU_ADDR);   // Zacznij transmisję do MPU (0x68)
-  Wire.write(PWR_MGMT_1);           // Wskaż rejestr PWR_MGMT_1 (0x6B)
-  Wire.write(0);                    // Zapisz wartość 0x00, aby wyłączyć tryb uśpienia
-  byte status = Wire.endTransmission(true); // Zakończ transmisję
-
-  // Sprawdź status operacji budzenia
   if (status == 0) {
     Serial.println("MPU wake-up successful!");
+    Serial.println("Using pre-calculated biases based on provided data.");
+    Serial.print("Gyro Y Bias to be subtracted: "); Serial.println(gyroY_bias); // Zwróć uwagę na ten bias
   } else {
-    Serial.print("MPU wake-up failed! Wire.endTransmission error code: ");
-    Serial.println(status);
-    Serial.println("Check wiring (SDA->21, SCL->22, VCC->3.3V!, GND->GND) and I2C address.");
-    Serial.println("Halting execution.");
-    while (1) { delay(100); } // Zatrzymaj program
+    Serial.print("MPU wake-up failed! Error code: "); Serial.println(status);
+    Serial.println("Check wiring. Halting.");
+    while (1);
   }
-  Serial.println("----------------------------------------------------");
-  Serial.println("Reading Raw Sensor Data...");
-  Serial.println("Format: AccX  AccY  AccZ  |  GyroX  GyroY  GyroZ");
-  Serial.println("----------------------------------------------------");
-  delay(500); // Krótka pauza przed pętlą główną
+  Serial.println("--------------------------------------------------------------------------");
+  Serial.println("Format: CalAccX(g) CalAccY(g) CalAccZ(g) | CalGyroX(dps) CalGyroY(dps) CalGyroZ(dps)");
+  Serial.println("--------------------------------------------------------------------------");
+  delay(500);
 }
 
 void loop() {
   bool readError = false;
 
-  // --- Odczyt Danych Akcelerometru ---
+  // --- Odczyt Surowych Danych (tak jak poprzednio) ---
   Wire.beginTransmission(MPU_ADDR);
-  Wire.write(ACCEL_XOUT_H); // Ustaw wskaźnik na początek danych akcelerometru (0x3B)
-  byte status_acc_ptr = Wire.endTransmission(false); // Wyślij restart (nie kończ sesji)
-
-  if (status_acc_ptr != 0) {
-     Serial.print("I2C Error setting Accel pointer: "); Serial.println(status_acc_ptr);
-     readError = true;
-  } else {
-     byte bytes_read_accel = Wire.requestFrom(MPU_ADDR, 6, true); // Poproś o 6 bajtów (AccX H/L, AccY H/L, AccZ H/L)
-     if (bytes_read_accel == 6) {
-       // Odczytaj i połącz bajty (starszy bajt << 8 | młodszy bajt)
-       rawAccX = (int16_t)(Wire.read() << 8 | Wire.read());
-       rawAccY = (int16_t)(Wire.read() << 8 | Wire.read());
-       rawAccZ = (int16_t)(Wire.read() << 8 | Wire.read());
-     } else {
-       Serial.print("I2C Error reading Accel data, bytes read: "); Serial.println(bytes_read_accel);
-       readError = true;
-     }
+  Wire.write(ACCEL_XOUT_H);
+  byte status_acc_ptr = Wire.endTransmission(false);
+  if (status_acc_ptr != 0) { readError = true; }
+  else {
+    byte bytes_read_accel = Wire.requestFrom((uint16_t)MPU_ADDR, (size_t)6, true);
+    if (bytes_read_accel == 6) {
+      rawAccX = (int16_t)(Wire.read() << 8 | Wire.read());
+      rawAccY = (int16_t)(Wire.read() << 8 | Wire.read());
+      rawAccZ = (int16_t)(Wire.read() << 8 | Wire.read());
+    } else { readError = true; }
   }
 
-  // --- Odczyt Danych Żyroskopu ---
-  // (Tylko jeśli odczyt akcelerometru nie napotkał błędu wskaźnika,
-  //  chociaż błąd odczytu mógł wystąpić)
   if (!readError) {
       Wire.beginTransmission(MPU_ADDR);
-      Wire.write(GYRO_XOUT_H); // Ustaw wskaźnik na początek danych żyroskopu (0x43)
-      byte status_gyro_ptr = Wire.endTransmission(false); // Wyślij restart
-
-      if (status_gyro_ptr != 0) {
-         Serial.print("I2C Error setting Gyro pointer: "); Serial.println(status_gyro_ptr);
-         readError = true;
-      } else {
-         byte bytes_read_gyro = Wire.requestFrom(MPU_ADDR, 6, true); // Poproś o 6 bajtów (GyroX H/L, GyroY H/L, GyroZ H/L)
+      Wire.write(GYRO_XOUT_H);
+      byte status_gyro_ptr = Wire.endTransmission(false);
+      if (status_gyro_ptr != 0) { readError = true; }
+      else {
+        byte bytes_read_gyro = Wire.requestFrom((uint16_t)MPU_ADDR, (size_t)6, true);
          if (bytes_read_gyro == 6) {
-           // Odczytaj i połącz bajty
            rawGyroX = (int16_t)(Wire.read() << 8 | Wire.read());
            rawGyroY = (int16_t)(Wire.read() << 8 | Wire.read());
            rawGyroZ = (int16_t)(Wire.read() << 8 | Wire.read());
-         } else {
-           Serial.print("I2C Error reading Gyro data, bytes read: "); Serial.println(bytes_read_gyro);
-           readError = true;
-         }
+         } else { readError = true; }
       }
   }
 
-  // --- Wyświetl Surowe Dane (jeśli nie było błędów I2C) ---
+  // --- Przetwarzanie, Kalibracja i Wyświetlanie ---
   if (!readError) {
-      Serial.print(rawAccX); Serial.print("\t"); // Użyj tabulatora jako separatora
-      Serial.print(rawAccY); Serial.print("\t");
-      Serial.print(rawAccZ); Serial.print("\t|\t");
-      Serial.print(rawGyroX); Serial.print("\t");
-      Serial.print(rawGyroY); Serial.print("\t");
-      Serial.println(rawGyroZ);
+    // Konwersja na jednostki fizyczne (tak jak poprzednio)
+    accX_g = (float)rawAccX / ACCEL_SCALE_FACTOR_G;
+    accY_g = (float)rawAccY / ACCEL_SCALE_FACTOR_G;
+    accZ_g = (float)rawAccZ / ACCEL_SCALE_FACTOR_G;
+    gyroX_dps = (float)rawGyroX / GYRO_SCALE_FACTOR_DPS;
+    gyroY_dps = (float)rawGyroY / GYRO_SCALE_FACTOR_DPS;
+    gyroZ_dps = (float)rawGyroZ / GYRO_SCALE_FACTOR_DPS;
+
+    // *** ZASTOSOWANIE KALIBRACJI (Odejmowanie Biasu) ***
+    calAccX_g = accX_g - accX_bias;
+    calAccY_g = accY_g - accY_bias;
+    // Dla AccZ odejmujemy różnicę od 1g, aby uzyskać odczyt względem idealnego poziomu
+    // (Zakładając, że podczas pomiaru biasu oś Z była pionowo w górę)
+    // Jeśli oś Z była w dół, odjęlibyśmy (accZ_bias - (-1.0)) czyli accZ_bias + 1.0
+    // Prostsze podejście: po prostu odjąć bias AccZ, aby wycentrować wokół średniej spoczynkowej.
+    // Zastosujmy prostsze: odjęcie biasu X i Y (powinny być 0), Z zostawiamy względem grawitacji
+     calAccZ_g = accZ_g; // Nie korygujemy Z na razie, bo zawiera grawitację
+
+    calGyroX_dps = gyroX_dps - gyroX_bias;
+    calGyroY_dps = gyroY_dps - gyroY_bias; // Tutaj korekta będzie znacząca
+    calGyroZ_dps = gyroZ_dps - gyroZ_bias;
+
+
+    // Wyświetl SKALIBROWANE wartości
+    Serial.print(calAccX_g, 3); Serial.print("\t");
+    Serial.print(calAccY_g, 3); Serial.print("\t");
+    Serial.print(calAccZ_g, 3); Serial.print("\t|\t"); // Z nadal nieskalibrowane względem 1g
+    Serial.print(calGyroX_dps, 3); Serial.print("\t");
+    Serial.print(calGyroY_dps, 3); Serial.print("\t"); // Ta wartość powinna być teraz bliska 0
+    Serial.println(calGyroZ_dps, 3);
+
   } else {
-      Serial.println("Skipping print due to read error.");
-      // Zeruj wartości w razie błędu, aby uniknąć używania starych danych
-      rawAccX=0; rawAccY=0; rawAccZ=0; rawGyroX=0; rawGyroY=0; rawGyroZ=0;
+      Serial.println("Read error occurred, skipping print.");
   }
 
-  delay(150); // Opóźnienie między cyklami odczytu
+  delay(150);
 }
