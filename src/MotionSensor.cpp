@@ -1,114 +1,177 @@
-// #include "MotionSensor.h"
-// #include <Arduino.h>
-// #include <Wire.h>
-// // Używamy głównego nagłówka biblioteki SparkFun (może wymagać dostosowania nazwy, jeśli jest inna)
-// // Najczęściej spotykany w nowszych wersjach to ten z DMP:
+#include "MotionSensor.h"
 
-// #include "quaternionFilters.h"
-// #include "MPU9250.h"
-// // Jeśli powyższy include nie działa, spróbuj:
-// // #include <MPU9250.h> // (jeśli taki plik istnieje w bibliotece SparkFun)
+// Konstruktor
+MotionSensor::MotionSensor(uint8_t addr) {
+    _mpu_addr = addr;
+    // Inicjalizacja zmiennych na 0
+    _rawAccX = _rawAccY = _rawAccZ = 0;
+    _rawGyroX = _rawGyroY = _rawGyroZ = 0;
+    _accX_g = _accY_g = _accZ_g = 0.0f;
+    _gyroX_dps = _gyroY_dps = _gyroZ_dps = 0.0f;
+    _pitch = _roll = 0.0f;
+}
 
-// MPU9250_DMP imu; // Tworzymy obiekt klasy z biblioteki SparkFun
-// bool isMpuInitialized = false;
+// Inicjalizacja
+bool MotionSensor::begin(int sda_pin, int scl_pin) {
+    Wire.begin(sda_pin, scl_pin);
+    // Wire.setClock(400000); // Opcjonalnie
 
-// // Stałe do konwersji jednostek
-// const float G_TO_MS2 = 9.80665;
-// // Biblioteka SparkFun często zwraca radiany/s dla żyroskopu, sprawdźmy
-// // const float DEG_TO_RAD_CONST = PI / 180.0; // Może nie być potrzebne
+    // Obudź MPU
+    // Używamy writeRegister dla uproszczenia i sprawdzenia
+    if (!writeRegister(PWR_MGMT_1, 0x00)) {
+         Serial.println("Error writing to PWR_MGMT_1 to wake up MPU!");
+         return false; // Błąd zapisu
+    }
+    delay(100); // Daj MPU chwilę na stabilizację po obudzeniu
 
-// bool motionSensorSetup() {
-//     // Adres jest zwykle domyślny (0x68 lub 0x69), begin() go znajduje
-//     Serial.println("  [MPU6500/9250] Próba inicjalizacji czujnika (SparkFun)...");
+    // Sprawdź, czy odczyt działa (opcjonalnie, można dodać odczyt WHO_AM_I)
+    uint8_t testRead = readRegister(PWR_MGMT_1);
+    if (testRead == 0xFF) { // 0xFF oznacza błąd odczytu w naszej funkcji pomocniczej
+        Serial.println("Error reading back from MPU after wake up!");
+        return false;
+    }
+    // Można by tu sprawdzić, czy testRead == 0, ale nie jest to krytyczne
 
-//     // Wywołaj begin() - zwraca status INV_SUCCESS (który = 0) jeśli OK
-//     // Funkcja ta sama konfiguruje I2C (przez Wire) i sprawdza WHO_AM_I
-//     inv_error_t status = imu.begin();
+    return true; // Inicjalizacja (obudzenie) udana
+}
 
-//     if (status != INV_SUCCESS) {
-//         Serial.print("  [MPU6500/9250] BŁĄD: Inicjalizacja MPU nie powiodła się! Kod błędu: ");
-//         Serial.println(status);
-//         isMpuInitialized = false;
-//         return false;
-//     }
+// Odczyt danych
+bool MotionSensor::readData() {
+    bool readError = false;
 
-//     Serial.println("  [MPU6500/9250] Inicjalizacja (imu.begin) OK.");
+    // --- Odczyt Akcelerometru (Raw) ---
+    Wire.beginTransmission(_mpu_addr);
+    Wire.write(ACCEL_XOUT_H);
+    byte status_acc_ptr = Wire.endTransmission(false);
+    if (status_acc_ptr != 0) { readError = true; }
+    else {
+        byte bytes_read_accel = Wire.requestFrom(_mpu_addr, (uint8_t)6, (uint8_t)true); // Jawne rzutowanie dla pewności
+        if (bytes_read_accel == 6) {
+            _rawAccX = (int16_t)(Wire.read() << 8 | Wire.read());
+            _rawAccY = (int16_t)(Wire.read() << 8 | Wire.read());
+            _rawAccZ = (int16_t)(Wire.read() << 8 | Wire.read());
+        } else { readError = true; }
+    }
 
-//     // Ustawienie zakresów i filtrów - używamy funkcji z API SparkFun
-//     // (Zakładając, że chcemy te same zakresy co poprzednio)
-//     if (imu.setAccelFSR(8) != INV_SUCCESS) { // Zakres w G
-//          Serial.println("  [MPU6500/9250] OSTRZEŻENIE: Nie udało się ustawić zakresu akcelerometru.");
-//     }
-//      if (imu.setGyroFSR(500) != INV_SUCCESS) { // Zakres w stopniach/s
-//          Serial.println("  [MPU6500/9250] OSTRZEŻENIE: Nie udało się ustawić zakresu żyroskopu.");
-//     }
-//     // Ustawienie filtra dolnoprzepustowego (w Hz)
-//      if (imu.setLPF(42) != INV_SUCCESS) { // Np. 42Hz, można dobrać inną wartość (5, 10, 21, 42, 98, 188)
-//          Serial.println("  [MPU6500/9250] OSTRZEŻENIE: Nie udało się ustawić filtra LPF.");
-//      }
-//     // Ustawienie częstotliwości próbkowania (w Hz)
-//      if (imu.setSampleRate(50) != INV_SUCCESS) { // Np. 50Hz
-//           Serial.println("  [MPU6500/9250] OSTRZEŻENIE: Nie udało się ustawić częstotliwości próbkowania.");
-//      }
-//     // Włączenie czujników
-//      if (imu.setSensors(INV_XYZ_ACCEL | INV_XYZ_GYRO | INV_XYZ_COMPASS) != INV_SUCCESS){ // Włączamy też kompas, choć go nie używamy - może być wymagane
-//          Serial.println("  [MPU6500/9250] OSTRZEŻENIE: Nie udało się włączyć sensorów.");
-//      }
+    // --- Odczyt Żyroskopu (Raw) ---
+    if (!readError) {
+        Wire.beginTransmission(_mpu_addr);
+        Wire.write(GYRO_XOUT_H);
+        byte status_gyro_ptr = Wire.endTransmission(false);
+        if (status_gyro_ptr != 0) { readError = true; }
+        else {
+            byte bytes_read_gyro = Wire.requestFrom(_mpu_addr, (uint8_t)6, (uint8_t)true);
+            if (bytes_read_gyro == 6) {
+                _rawGyroX = (int16_t)(Wire.read() << 8 | Wire.read());
+                _rawGyroY = (int16_t)(Wire.read() << 8 | Wire.read());
+                _rawGyroZ = (int16_t)(Wire.read() << 8 | Wire.read());
+            } else { readError = true; }
+        }
+    }
+
+    if (readError) {
+        Serial.println("I2C read error occurred in MotionSensor::readData()!");
+        return false;
+    }
+
+    // --- Konwersja i Kalibracja ---
+    _accX_g = ((float)_rawAccX / _accel_scale_factor_g) - _accX_bias;
+    _accY_g = ((float)_rawAccY / _accel_scale_factor_g) - _accY_bias;
+    _accZ_g = ((float)_rawAccZ / _accel_scale_factor_g); // Z bez odejmowania offsetu 1g
+    _gyroX_dps = ((float)_rawGyroX / _gyro_scale_factor_dps) - _gyroX_bias;
+    _gyroY_dps = ((float)_rawGyroY / _gyro_scale_factor_dps) - _gyroY_bias;
+    _gyroZ_dps = ((float)_rawGyroZ / _gyro_scale_factor_dps) - _gyroZ_bias;
+
+    // Oblicz kąty po odczytaniu danych
+    calculateAngles();
+
+    return true; // Odczyt udany
+}
+
+// Obliczanie kątów (prosta metoda z akcelerometru)
+void MotionSensor::calculateAngles() {
+    // Te obliczenia działają najlepiej, gdy czujnik jest względnie nieruchomy.
+    // Podatne na zakłócenia od przyspieszeń liniowych.
+    // Wynik w stopniach.
+    _roll = atan2(_accY_g, _accZ_g) * 180.0 / M_PI;
+    _pitch = atan2(-_accX_g, sqrt(_accY_g * _accY_g + _accZ_g * _accZ_g)) * 180.0 / M_PI;
+}
+
+// Sprawdzanie przechyłu
+bool MotionSensor::isTilted(float threshold_degrees) {
+    // Upewnij się, że kąty są aktualne (można by to przenieść do readData)
+    // calculateAngles(); // calculateAngles jest już wywoływane w readData()
+    return (abs(_pitch) > threshold_degrees || abs(_roll) > threshold_degrees);
+}
+
+// Konfiguracja Wake on Motion (dla MPU-6500) - wymaga testowania i dostrojenia!
+bool MotionSensor::setupWakeOnMotion(uint8_t threshold_mg_per_lsb) {
+    Serial.println("Configuring Wake on Motion...");
+
+    // 1. Reset device (optional but recommended)
+    if (!writeRegister(PWR_MGMT_1, 0x80)) return false; // Reset
+    delay(100);
+    // Wake up again
+    if (!writeRegister(PWR_MGMT_1, 0x00)) return false;
+    delay(100);
+
+    // Konfiguracja dla MPU-6500 Wake-on-Motion (bazując na datasheet i notach aplikacyjnych)
+    // Używamy trybu "Cycle" z niską częstotliwością próbkowania akcelerometru
+
+    // Ustaw akcelerometr w trybie low power ODR (Output Data Rate)
+    // Przykład: 1.25 Hz ODR (0x07) - im niższa tym mniejszy pobór prądu,
+    // ale wolniejsza reakcja na ruch. Wybierz eksperymentalnie.
+    // 0 = 0.31 Hz, 1 = 0.62 Hz, ..., 6 = 20 Hz, 7 = 40 Hz ... 10 = 500Hz
+    if (!writeRegister(LP_ACCEL_ODR, 0x06)) return false; // ok 20 Hz
+
+    // Ustaw próg Wake-on-Motion
+    // Jednostka: 1 LSB = 4mg (w zakresie +/-2g)
+    // threshold_mg_per_lsb = 2 oznacza próg 2*4 = 8mg
+    if (!writeRegister(ACCEL_WOM_THR, threshold_mg_per_lsb)) return false;
+
+    // Włącz funkcję Wake-on-Motion dla akcelerometru
+    // Ustaw bit ACCEL_INTEL_EN i ACCEL_INTEL_MODE (compare with previous sample)
+    if (!writeRegister(ACCEL_INTEL_CTRL, 0xC0)) return false; // Enable WoM logic, compare current sample to previous sample
+
+    // Skonfiguruj pin INT
+    // Np. Active low, push-pull, latching until cleared
+    // Bit 7=ACTL(0=active H), 6=OPEN(0=push-pull), 5=LATCH_INT_EN(1=latch), 4=INT_ANYRD_2CLEAR(0=cleared on status read)
+    if (!writeRegister(INT_PIN_CFG, 0x20)) return false; // Latching, push-pull, active high
+
+    // Włącz przerwanie Wake-on-Motion
+    // Bit 6 = WOM_INT_EN
+    if (!writeRegister(INT_ENABLE, 0x40)) return false; // Enable Wake On Motion interrupt only
+
+    // Na koniec, przełącz MPU w tryb Cycle (niski pobór mocy, tylko akcelerometr aktywny)
+    // Ustaw bit CYCLE w PWR_MGMT_1 (bit 5) i wyłącz SLEEP (bit 6 = 0)
+    if (!writeRegister(PWR_MGMT_1, 0x20)) return false; // CYCLE=1, SLEEP=0
+
+    Serial.println("Wake on Motion configured (hopefully).");
+    return true;
+}
 
 
-//     Serial.println("  [MPU6500/9250] Czujnik zainicjalizowany i skonfigurowany (SparkFun).");
-//     isMpuInitialized = true;
-//     return true;
-// }
+// --- Prywatne funkcje pomocnicze ---
 
-// bool motionSensorReadRaw(float &ax, float &ay, float &az, float &gx, float &gy, float &gz) {
-//     if (!isMpuInitialized) {
-//         return false;
-//     }
+bool MotionSensor::writeRegister(uint8_t reg, uint8_t value) {
+  Wire.beginTransmission(_mpu_addr);
+  Wire.write(reg);
+  Wire.write(value);
+  byte status = Wire.endTransmission(true);
+  return (status == 0); // Zwróć true jeśli zapis się powiódł (ACK)
+}
 
-//     // Sprawdź, czy nowe dane są dostępne
-//     if (imu.dataReady()) {
-//         // Odczytaj dane (aktualizuje publiczne zmienne obiektu imu)
-//         // UPDATE_COMPASS może być niepotrzebne, jeśli nie ma magnetometru
-//         imu.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS | UPDATE_TEMP);
-
-//         // Pobierz wartości z publicznych zmiennych członkowskich obiektu imu
-//         // Jednostki: ax, ay, az w [G]; gx, gy, gz w [deg/s]
-
-//         // Przyspieszenie (G) -> m/s^2
-//         ax = imu.ax * G_TO_MS2;
-//         ay = imu.ay * G_TO_MS2;
-//         az = imu.az * G_TO_MS2;
-
-//         // Prędkość kątowa (deg/s) -> rad/s
-//         // Sprawdźmy, czy biblioteka nie zwraca rad/s bezpośrednio (mało prawdopodobne)
-//         // Jeśli imu.gx jest w dps:
-//         gx = imu.gx * DEG_TO_RAD_CONST;
-//         gy = imu.gy * DEG_TO_RAD_CONST;
-//         gz = imu.gz * DEG_TO_RAD_CONST;
-
-//         return true; // Sukces - odczytano nowe dane
-//     }
-
-//     return false; // Brak nowych danych
-// }
-
-// float motionSensorReadTemperature() {
-//     if (!isMpuInitialized) {
-//        return NAN; // Używamy NAN z <cmath>
-//    }
-//     // Zakładamy, że imu.update() zostało wywołane w motionSensorReadRaw()
-//     // i zaktualizowało publiczną zmienną 'temperature'
-//     // Sprawdź, czy ta zmienna istnieje w bibliotece SparkFun (powinna)
-//     return imu.temperature; // Zwraca stopnie Celsjusza
-// }
-
-// // Funkcja obliczająca kąt - bez zmian
-// float motionSensorCalculateTiltAngleZ(float ax, float ay, float az) {
-//     if (az == 0.0) return 90.0;
-//     // Upewnij się, że <cmath> jest dołączone w main.cpp lub tutaj
-//     float angleRad = atan2(sqrt(ax * ax + ay * ay), abs(az));
-//     // Używamy PI z Arduino.h lub math.h
-//     float angleDeg = angleRad * 180.0 / PI;
-//     return angleDeg;
-// }
+uint8_t MotionSensor::readRegister(uint8_t reg) {
+  Wire.beginTransmission(_mpu_addr);
+  Wire.write(reg);
+  byte status = Wire.endTransmission(false); // Wyślij restart
+  if (status != 0) {
+    return 0xFF; // Błąd przy wysyłaniu adresu rejestru
+  }
+  byte byteCount = Wire.requestFrom(_mpu_addr, (uint8_t)1, (uint8_t)true); // Poproś o 1 bajt
+  if (byteCount == 1) {
+    return Wire.read();
+  } else {
+    return 0xFF; // Błąd odczytu
+  }
+}
