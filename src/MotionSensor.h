@@ -31,6 +31,8 @@ public:
     //           W MPU-6500 ustawia się bardziej próg i częstotliwość próbkowania w trybie low power.
     bool setupWakeOnMotion(uint8_t threshold_mg_per_lsb = 2); // Próg w mg/LSB (domyślnie 2mg/LSB)
 
+    bool enterCycleMode(); 
+    
     // Gettery (funkcje dostępowe) do odczytanych wartości
     float getAccX_g() { return _accX_g; }
     float getAccY_g() { return _accY_g; }

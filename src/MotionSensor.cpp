@@ -109,11 +109,11 @@ bool MotionSensor::setupWakeOnMotion(uint8_t threshold_mg_per_lsb) {
     Serial.println("Configuring Wake on Motion...");
 
     // 1. Reset device (optional but recommended)
-    if (!writeRegister(PWR_MGMT_1, 0x80)) return false; // Reset
-    delay(100);
-    // Wake up again
-    if (!writeRegister(PWR_MGMT_1, 0x00)) return false;
-    delay(100);
+    // if (!writeRegister(PWR_MGMT_1, 0x80)) return false; // Reset
+    // delay(100);
+    // // Wake up again
+    // if (!writeRegister(PWR_MGMT_1, 0x00)) return false;
+    // delay(100);
 
     // Konfiguracja dla MPU-6500 Wake-on-Motion (bazując na datasheet i notach aplikacyjnych)
     // Używamy trybu "Cycle" z niską częstotliwością próbkowania akcelerometru
@@ -144,13 +144,18 @@ bool MotionSensor::setupWakeOnMotion(uint8_t threshold_mg_per_lsb) {
 
     // Na koniec, przełącz MPU w tryb Cycle (niski pobór mocy, tylko akcelerometr aktywny)
     // Ustaw bit CYCLE w PWR_MGMT_1 (bit 5) i wyłącz SLEEP (bit 6 = 0)
-    if (!writeRegister(PWR_MGMT_1, 0x20)) return false; // CYCLE=1, SLEEP=0
+    //if (!writeRegister(PWR_MGMT_1, 0x20)) return false; // CYCLE=1, SLEEP=0
 
     Serial.println("Wake on Motion configured (hopefully).");
     return true;
 }
 
-
+bool MotionSensor::enterCycleMode() {
+    Serial.println("MPU: Entering Cycle Mode (Low Power)...");
+    // Ustaw bit CYCLE (bit 5) w PWR_MGMT_1 (0x6B), wyłącz SLEEP (bit 6 = 0)
+    // Inne bity powinny być 0 dla standardowej pracy zegara
+    return writeRegister(PWR_MGMT_1, 0x20);
+}
 // --- Prywatne funkcje pomocnicze ---
 
 bool MotionSensor::writeRegister(uint8_t reg, uint8_t value) {
