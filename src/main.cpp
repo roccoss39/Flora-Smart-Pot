@@ -1,129 +1,216 @@
 #include <Arduino.h>
-#include "MotionSensor.h" // Dołącz nagłówek naszej klasy
+#include <Wire.h>              // Nadal potrzebne, jeśli planujesz inne urządzenia I2C
+#include <esp_sleep.h>       // Dla Deep Sleep i Wakeup Cause
+#include <cmath>             // Dla abs(), isnan(), sqrt(), atan2()
 
-// --- Konfiguracja ---
-#define SDA_PIN 21 // Domyślny SDA dla ESP32
-#define SCL_PIN 22 // Domyślny SCL dla ESP32
+// Nasze moduły
+#include "DeviceConfig.h"
+#include "secrets.h"          // Dla danych WiFi i Blynk
+#include "WiFiManager.h"
+#include "BlynkManager.h"
+#include "SoilSensor.h"
+#include "WaterLevelSensor.h" // Definiuje NUM_WATER_LEVELS
+#include "PumpControl.h"
+#include "BatteryMonitor.h"
+#include "EnvironmentSensor.h" // Dla DHT11
+// #include "MotionSensor.h"   // <<--- ZAKOMENTOWANY LUB USUNIĘTY
+#include "PowerManager.h"
 
-const float TILT_THRESHOLD_DEGREES = 15.0;
-const uint8_t WOM_THRESHOLD = 1;     // Czułość WoM (0-255, niższa=czulszy) - może wymagać dostrojenia!
-#define DEEP_SLEEP_ENABLED true       // ******** Włączone dla testu! ********
-#define SLEEP_DURATION_SECONDS 30     // Krótszy czas do uśpienia dla testów
-#define MPU_INT_PIN 35                // GPIO ESP32 podłączony do INT MPU (musi być RTC!)
+// Funkcja pomocnicza do drukowania przyczyny wybudzenia
+void print_wakeup_reason(){
+  esp_sleep_wakeup_cause_t wakeup_reason;
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+  Serial.print("Przyczyna uruchomienia/wybudzenia: ");
+  switch(wakeup_reason)
+  {
+    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("EXT0 (zewnętrzne przerwanie 0)"); break;
+    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("EXT1 (zewnętrzne przerwanie 1)"); break;
+    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP : Serial.println("ULP Program"); break;
+    default : Serial.printf("Reset lub Power On (przyczyna nr %d)\n", wakeup_reason); break;
+  }
+}
 
-MotionSensor motionSensor;
-unsigned long lastOkTime = 0;
-bool firstLoopAfterWake = false; // Flaga do obsługi pierwszego cyklu po wybudzeniu
+// Wbudowana dioda LED
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 2
+#endif
+
+// Zmienna do śledzenia czasu ostatniej wysyłki do Blynk
+unsigned long lastBlynkSend = 0;
 
 void setup() {
-  Serial.begin(115200);
-  while (!Serial);
-  delay(100); // Krótka pauza dla stabilizacji Serial
-  Serial.println("\n\n--- Smart Plant Monitor ---");
+    Serial.begin(115200);
+    Serial.println("\n--- Flaura Smart Pot - Główny Start ---");
+    print_wakeup_reason();
 
-  // Sprawdź przyczynę wybudzenia
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  Serial.print("Wakeup Cause: ");
-  switch(wakeup_reason) {
-    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("External signal using RTC_IO (MPU INT)"); firstLoopAfterWake = true; break;
-    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Timer"); break;
-    // Dodaj inne przyczyny jeśli potrzebujesz
-    default : Serial.println("Power ON or other reset"); break;
-  }
+    Wire.begin(); // Inicjalizuj I2C raz (może się przydać w przyszłości)
+    delay(100);
 
-  // Inicjalizuj czujnik ruchu - funkcja begin() ustawi PWR_MGMT_1 = 0 (normalny tryb)
-  if (!motionSensor.begin(SDA_PIN, SCL_PIN)) { // Przekazujemy piny
-    Serial.println("FATAL: Failed to initialize Motion Sensor!");
-    while(1);
-  }
-  Serial.println("Motion Sensor Initialized (Normal Mode).");
+    configSetup(); // Wczytaj konfigurację
 
-  // Skonfiguruj Wake on Motion (tylko jeśli Deep Sleep włączony)
-  if (DEEP_SLEEP_ENABLED) {
-    Serial.println("Configuring Wake on Motion settings...");
-    // Podłącz pin INT z MPU do MPU_INT_PIN na ESP32!
-    if (motionSensor.setupWakeOnMotion(WOM_THRESHOLD)) {
-      Serial.println("Wake on Motion configured on MPU.");
-      // Skonfiguruj ESP32 do wybudzania pinem MPU_INT_PIN (Active High)
-      if (esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 1) == ESP_OK) { // Rzutowanie na gpio_num_t
-          Serial.print("ESP32 will wake up on HIGH signal on GPIO: ");
-          Serial.println(MPU_INT_PIN);
-      } else {
-          Serial.println("Error configuring ESP32 EXT0 wakeup!");
-      }
+    // Inicjalizuj wszystkie moduły (oprócz MPU)
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH); // Zaświeć na czas setup
+
+    soilSensorSetup();
+    waterLevelSensorSetup();
+    pumpControlSetup();
+    batteryMonitorSetup();
+    environmentSensorSetup();
+    // motionSensorSetup(); // <<--- ZAKOMENTOWANE LUB USUNIĘTE
+
+    digitalWrite(LED_BUILTIN, LOW); // Zgaś po inicjalizacji
+
+    // --- Logika połączenia i pierwszego pomiaru ---
+    bool runMeasurement = true;
+    bool connectSuccess = false;
+
+    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    if (cause == ESP_SLEEP_WAKEUP_UNDEFINED || configIsContinuousMode()) {
+        if (wifiConnect(SECRET_SSID, SECRET_PASS)) {
+            blynkConfigure(BLYNK_AUTH_TOKEN, BLYNK_TEMPLATE_ID, BLYNK_DEVICE_NAME);
+            connectSuccess = blynkConnect(); // Spróbuj połączyć z Blynk
+        } else {
+            runMeasurement = false;
+            Serial.println("Brak WiFi, pomijam cykl pomiarowy przy starcie.");
+        }
     } else {
-      Serial.println("Failed to configure Wake on Motion on MPU!");
+         // Wybudzono z Deep Sleep - konfiguracja Blynk wystarczy przed wysłaniem
+         blynkConfigure(BLYNK_AUTH_TOKEN, BLYNK_TEMPLATE_ID, BLYNK_DEVICE_NAME);
+         // Zakładamy, że pomiar i próba wysłania nastąpią
     }
-  }
-  lastOkTime = millis(); // Zresetuj timer bezczynności
-  Serial.println("-----------------------------");
-}
+
+    if (runMeasurement) {
+        Serial.println("\n--- Pierwszy pomiar/cykl po starcie/wybudzeniu ---");
+        digitalWrite(LED_BUILTIN, HIGH);
+
+        // Odczyty sensorów (bez MPU)
+        int currentMoisture = soilSensorReadPercent();
+        int currentWaterLevel = waterLevelSensorReadLevel();
+        float currentBatteryVoltage = batteryMonitorReadVoltage();
+        float currentTemperatureDHT;
+        float currentHumidityDHT;
+        bool dhtOk = environmentSensorRead(currentTemperatureDHT, currentHumidityDHT);
+
+        digitalWrite(LED_BUILTIN, LOW);
+
+        // Wyświetl wyniki lokalnie
+        Serial.println("--- Wyniki pomiarów ---");
+        if(currentMoisture >= 0) Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture); else Serial.println("Wilgotność gleby: Błąd odczytu");
+        Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
+        if(currentBatteryVoltage > 0) Serial.printf("Napięcie baterii: %.2f V\n", currentBatteryVoltage); else Serial.println("Napięcie baterii: Błąd odczytu / Odłączona");
+        if (dhtOk && !isnan(currentTemperatureDHT) && !isnan(currentHumidityDHT)) {
+            Serial.printf("Temperatura (DHT11): %.1f C\n", currentTemperatureDHT);
+            Serial.printf("Wilgotność pow. (DHT11): %.1f %%\n", currentHumidityDHT);
+         } else {
+             Serial.println("Temperatura/Wilgotność (DHT11): Błąd odczytu");
+         }
+         // Usunięto sekcję MPU
+        Serial.println("-----------------------");
+
+        // Wyślij dane do Blynk
+        // Spróbuj połączyć WiFi/Blynk jeśli potrzeba (np. po wybudzeniu)
+        if (!wifiIsConnected()){ wifiConnect(SECRET_SSID, SECRET_PASS, 5000); }
+        if (wifiIsConnected()) {
+            if (!blynkIsConnected()) { blynkConnect(3000); }
+            // Wyślij dane (bez MPU)
+             blynkSendSensorData(currentMoisture, currentWaterLevel, currentBatteryVoltage,
+                                  currentTemperatureDHT, currentHumidityDHT,
+                                  NAN, false, pumpControlIsRunning()); // Przekazujemy NAN dla tilt i false dla alertu
+             lastBlynkSend = millis();
+        }
+
+        // Kontrola pompy (bez sprawdzania przechyłu)
+        pumpControlActivateIfNeeded(currentMoisture, currentWaterLevel);
+
+    } // koniec if(runMeasurement)
+
+    // --- Przejście w Deep Sleep (tylko w tym trybie) ---
+    if (!configIsContinuousMode()) {
+        digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
+        Serial.println("Rozłączam WiFi/Blynk i konfiguruję wybudzanie (tylko timer)...");
+        blynkDisconnect();
+        wifiDisconnect();
+        // Usunięto konfigurację wybudzania przez MPU INT
+        powerManagerGoToDeepSleep(); // Konfiguruje timer i idzie spać
+    } else {
+        Serial.println("Tryb ciągły aktywny. Dalsza praca w loop().");
+    }
+} // Koniec setup()
+
 
 void loop() {
+    if (configIsContinuousMode()) {
+        // --- TRYB CIĄGŁY ---
+        // Obsługa Blynk
+        if(wifiIsConnected()) {
+           if(!blynkIsConnected()) {
+              Serial.println("Blynk rozłączony w loop(), próba połączenia...");
+              blynkConnect(1000);
+           }
+           blynkRun(); // Obsługa komunikacji Blynk
+        } else {
+            static unsigned long lastWifiTry = 0;
+            if(millis() - lastWifiTry > 60000) { // Próbuj co minutę
+                Serial.println("Próba ponownego połączenia z WiFi w loop()...");
+                wifiConnect(SECRET_SSID, SECRET_PASS, 5000);
+                lastWifiTry = millis();
+            }
+        }
 
-  // Opcjonalnie: zignoruj pierwszy odczyt po wybudzeniu, aby dać czas na stabilizację
-  if(firstLoopAfterWake) {
-    Serial.println("First loop after wake-up, allowing sensor to stabilize...");
-    delay(500); // Poczekaj chwilę
-    firstLoopAfterWake = false; // Zresetuj flagę
-    // Przeczytaj dane raz, aby wyczyścić ewentualne stare flagi przerwań w MPU?
-    motionSensor.readData();
-    lastOkTime = millis(); // Zresetuj timer, aby od razu nie usnął
-    return; // Przejdź do następnej iteracji pętli
-  }
+        // Okresowe wysyłanie danych do Blynk
+        uint32_t interval = configGetBlynkSendIntervalSec() * 1000;
+        if (interval == 0) interval = 60000;
 
+        if (millis() - lastBlynkSend > interval) {
+            Serial.println("\n--- Cykliczny pomiar i wysyłka danych (tryb ciągły) ---");
+            digitalWrite(LED_BUILTIN, HIGH);
 
-  // Odczytaj dane z czujnika
-  if (motionSensor.readData()) {
-    // Dane odczytane pomyślnie
+            // Odczyty sensorów (bez MPU)
+            int currentMoisture = soilSensorReadPercent();
+            int currentWaterLevel = waterLevelSensorReadLevel();
+            float currentBatteryVoltage = batteryMonitorReadVoltage();
+            float currentTemperatureDHT;
+            float currentHumidityDHT;
+            bool dhtOk = environmentSensorRead(currentTemperatureDHT, currentHumidityDHT);
 
-    // --- Logika Alarmu Przechyłu ---
-    if (motionSensor.isTilted(TILT_THRESHOLD_DEGREES)) {
-      Serial.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-      Serial.print("ALARM: Doniczka przechylona! Pitch: ");
-      Serial.print(motionSensor.getPitch());
-      Serial.print(", Roll: ");
-      Serial.println(motionSensor.getRoll());
-      Serial.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-      lastOkTime = millis(); // Reset timera, bo wykryto alarm/ruch
+            digitalWrite(LED_BUILTIN, LOW);
+
+            // Wyświetlanie lokalne
+            Serial.println("--- Wyniki pomiarów ---");
+            if(currentMoisture >= 0) Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture); else Serial.println("Wilgotność gleby: Błąd odczytu");
+            Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
+            if(currentBatteryVoltage > 0) Serial.printf("Napięcie baterii: %.2f V\n", currentBatteryVoltage); else Serial.println("Napięcie baterii: Błąd odczytu / Odłączona");
+           if (dhtOk && !isnan(currentTemperatureDHT) && !isnan(currentHumidityDHT)) {
+                Serial.printf("Temperatura (DHT11): %.1f C\n", currentTemperatureDHT);
+                Serial.printf("Wilgotność pow. (DHT11): %.1f %%\n", currentHumidityDHT);
+             } else {
+                 Serial.println("Temperatura/Wilgotność (DHT11): Błąd odczytu");
+             }
+            // Usunięto sekcję MPU
+            Serial.println("-------------------------------------");
+
+             // Wyślij dane do Blynk (jeśli jest połączenie)
+             if (blynkIsConnected()) {
+                 blynkSendSensorData(currentMoisture, currentWaterLevel, currentBatteryVoltage,
+                                      currentTemperatureDHT, currentHumidityDHT,
+                                      NAN, false, pumpControlIsRunning()); // Przekazujemy NAN dla tilt i false dla alertu
+                 lastBlynkSend = millis();
+             } else {
+                  Serial.println("Pomijam wysyłkę - brak połączenia z Blynk.");
+             }
+
+            // Kontrola pompy
+            pumpControlActivateIfNeeded(currentMoisture, currentWaterLevel);
+
+        } // koniec if (millis() - lastBlynkSend > interval)
+
     } else {
-      // Stan OK - drukuj normalne dane
-      Serial.print("Acc(g): ");
-      Serial.print(motionSensor.getAccX_g(), 2); Serial.print(", ");
-      Serial.print(motionSensor.getAccY_g(), 2); Serial.print(", ");
-      Serial.print(motionSensor.getAccZ_g(), 2);
-      Serial.print(" | Gyro(dps): ");
-      Serial.print(motionSensor.getGyroX_dps(), 2); Serial.print(", ");
-      Serial.print(motionSensor.getGyroY_dps(), 2); Serial.print(", ");
-      Serial.print(motionSensor.getGyroZ_dps(), 2);
-      Serial.print(" | Pitch: "); Serial.print(motionSensor.getPitch(), 1);
-      Serial.print(" | Roll: "); Serial.println(motionSensor.getRoll(), 1);
-
-      // --- Logika Usypiania (tylko jeśli włączone) ---
-      if (DEEP_SLEEP_ENABLED && (millis() - lastOkTime > (SLEEP_DURATION_SECONDS * 1000))) {
-          Serial.print("No significant tilt detected for ");
-          Serial.print(SLEEP_DURATION_SECONDS);
-          Serial.println(" seconds.");
-
-          // *** Krok 1: Przełącz MPU w tryb niskiego poboru mocy (Cycle Mode) ***
-          if (!motionSensor.enterCycleMode()) {
-              Serial.println("Error putting MPU into cycle mode! Aborting sleep.");
-          } else {
-              // *** Krok 2: Przejdź w tryb głębokiego uśpienia ESP32 ***
-              Serial.println("MPU in Cycle Mode. Entering ESP32 deep sleep. Tap pot to wake...");
-              Serial.flush(); // Upewnij się, że Serial wysłał wszystko
-              esp_deep_sleep_start(); // Uśpij ESP32
-              // Kod tutaj już się nie wykona aż do następnego wybudzenia (resetu)
-          }
-          lastOkTime = millis(); // Zresetuj timer na wszelki wypadek (gdyby sleep się nie udał)
-      }
+        // Tryb Deep Sleep - pętla nie powinna być często osiągana
+        Serial.println("BŁĄD: Niespodziewane wykonanie pętli loop() w trybie Deep Sleep!");
+        digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+        delay(1000);
     }
-
-  } else {
-    // Błąd odczytu danych
-    Serial.println("Error reading sensor data in loop.");
-    lastOkTime = millis(); // Zresetuj timer, żeby nie usnął od razu po błędzie
-  }
-
-  delay(200); // Opóźnienie między odczytami/sprawdzeniami
-}
+} // Koniec loop()

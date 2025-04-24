@@ -43,6 +43,10 @@ const uint8_t DEFAULT_MPU_INT_PIN = 33; // Domyślny pin dla przerwania MPU
 // General
 const uint32_t DEFAULT_SLEEP_SECONDS = 3600; // 1 godzina
 const bool DEFAULT_CONTINUOUS_MODE = false; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
+//Blynk
+const char* PREF_BLYNK_INTERVAL = "blynkInt";
+const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 10; // Domyślnie co 60 sekund
+static uint32_t blynkSendIntervalSec;
 
 // Zmienne statyczne
 static uint8_t soilSensorPin;
@@ -78,6 +82,7 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putUChar(PREF_MPU_INT_PIN, DEFAULT_MPU_INT_PIN); // Zapisz pin INT MPU
         preferences.putUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS);
         preferences.putBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
+        preferences.putUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
      }
 }
 
@@ -101,6 +106,7 @@ void configSetup() {
     mpuIntPin = preferences.getUChar(PREF_MPU_INT_PIN, DEFAULT_MPU_INT_PIN); // Wczytaj pin INT MPU
     sleepDurationSeconds = preferences.getUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS);
     continuousMode = preferences.getBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
+    blynkSendIntervalSec = preferences.getUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
 
     preferences.end();
 
@@ -122,6 +128,8 @@ void configSetup() {
     Serial.printf("  Pin DHT11: %d\n", dhtPin);
     Serial.printf("  Pin INT MPU6500: %d\n", mpuIntPin); // Wydrukuj pin INT MPU
     Serial.printf("  Czas uśpienia: %d s\n", sleepDurationSeconds);
+    Serial.printf("  Interwał wysyłania Blynk: %d s\n", blynkSendIntervalSec);
+
     Serial.println("--------------------");
 }
 
@@ -138,6 +146,7 @@ int configGetSoilThresholdPercent() { return soilMoistureThreshold; }
 uint8_t configGetBatteryAdcPin() { return batteryAdcPin; }
 uint8_t configGetDhtPin() { return dhtPin; }
 uint8_t configGetMpuIntPin() { return mpuIntPin; } // Getter dla pinu INT MPU
+uint32_t configGetBlynkSendIntervalSec() { return blynkSendIntervalSec; }
 
 uint8_t configGetWaterLevelPin(int level) {
     if (level >= 1 && level <= NUM_WATER_LEVELS_CONFIG) {
@@ -145,3 +154,47 @@ uint8_t configGetWaterLevelPin(int level) {
     }
     return 255;
 }
+
+// --- IMPLEMENTACJA NOWYCH SETTERÓW ---
+
+/**
+ * @brief Ustawia i zapisuje nowy czas pracy pompy.
+ */
+void configSetPumpRunMillis(uint32_t durationMs) {
+    // Walidacja wartości (przykładowa - max 30 sekund)
+    if (durationMs > 30000) {
+        durationMs = 30000;
+        Serial.println("Ostrzeżenie: Czas pracy pompy ograniczony do 30000 ms.");
+    }
+    if (durationMs < 500) { // Minimalny czas
+         durationMs = 500;
+         Serial.println("Ostrzeżenie: Minimalny czas pracy pompy to 500 ms.");
+    }
+
+    if (pumpRunMillis != durationMs) { // Zapisz tylko jeśli wartość się zmieniła
+        pumpRunMillis = durationMs; // Zaktualizuj wartość w pamięci RAM
+        preferences.begin(PREF_NAMESPACE, false); // Otwórz R/W
+        preferences.putUInt(PREF_PUMP_RUN_MS, pumpRunMillis); // Zapisz nową wartość do Flash
+        preferences.end(); // Zamknij
+        Serial.printf("Zapisano nowy czas pracy pompy: %d ms\n", pumpRunMillis);
+    }
+}
+
+
+/**
+ * @brief Ustawia i zapisuje nowy próg wilgotności gleby.
+ */
+void configSetSoilThresholdPercent(int threshold) {
+    // Walidacja wartości (0-100 %)
+    if (threshold < 0) threshold = 0;
+    if (threshold > 100) threshold = 100;
+
+    if (soilMoistureThreshold != threshold) { // Zapisz tylko jeśli wartość się zmieniła
+        soilMoistureThreshold = threshold; // Zaktualizuj wartość w RAM
+        preferences.begin(PREF_NAMESPACE, false); // Otwórz R/W
+        preferences.putInt(PREF_SOIL_THRESHOLD, soilMoistureThreshold); // Zapisz do Flash
+        preferences.end(); // Zamknij
+        Serial.printf("Zapisano nowy próg wilgotności dla pompy: %d %%\n", soilMoistureThreshold);
+    }
+}
+

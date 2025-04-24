@@ -33,4 +33,10 @@ uint8_t configGetMpuIntPin();
 // Getter dla czasu uśpienia
 uint32_t configGetSleepSeconds();
 
+uint32_t configGetBlynkSendIntervalSec();
+
+void configSetPumpRunMillis(uint32_t durationMs);
+
+void configSetSoilThresholdPercent(int threshold);
+
 #endif // DEVICECONFIG_H
