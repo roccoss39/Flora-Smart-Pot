@@ -129,15 +129,20 @@ void setup() {
 
     // --- Przejście w Deep Sleep (tylko w tym trybie) ---
     if (!configIsContinuousMode()) {
-        digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
-        Serial.println("Rozłączam WiFi/Blynk i konfiguruję wybudzanie (tylko timer)...");
-        blynkDisconnect();
-        wifiDisconnect();
-        // Usunięto konfigurację wybudzania przez MPU INT
-        powerManagerGoToDeepSleep(); // Konfiguruje timer i idzie spać
+      // Sprawdź, czy pompa nie pracuje
+      if (pumpControlIsRunning()) {
+          Serial.println("Pompa pracuje - pozostaję w trybie aktywnym do zakończenia pracy pompy.");
+          // Przejdź do loop() zamiast deep sleep
+      } else {
+          digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
+          Serial.println("Rozłączam WiFi/Blynk i konfiguruję wybudzanie (tylko timer)...");
+          blynkDisconnect();
+          wifiDisconnect();
+          powerManagerGoToDeepSleep(); // Konfiguruje timer i idzie spać
+      }
     } else {
-        Serial.println("Tryb ciągły aktywny. Dalsza praca w loop().");
-    }
+      Serial.println("Tryb ciągły aktywny. Dalsza praca w loop().");
+  }
 } // Koniec setup()
 
 
@@ -209,9 +214,20 @@ void loop() {
         } // koniec if (millis() - lastBlynkSend > interval)
 
     } else {
-        // Tryb Deep Sleep - pętla nie powinna być często osiągana
-        Serial.println("BŁĄD: Niespodziewane wykonanie pętli loop() w trybie Deep Sleep!");
-        digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-        delay(1000);
-    }
+      // Tryb Deep Sleep - ale pompa może być aktywna
+      pumpControlUpdate(); // Aktualizacja stanu pompy
+      
+      // Jeśli pompa skończyła pracę, przejdź w deep sleep
+      if (!pumpControlIsRunning()) {
+          Serial.println("Pompa zakończyła pracę, przechodzę do deep sleep...");
+          digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
+          blynkDisconnect();
+          wifiDisconnect();
+          powerManagerGoToDeepSleep();
+      } else {
+          // Jeśli pompa jeszcze pracuje, pozwól jej działać
+          Serial.println("Pompa nadal pracuje...");
+          delay(1000); // Krótkie opóźnienie, aby nie generować zbyt wielu logów
+      }
+  }
 } // Koniec loop()

@@ -47,10 +47,11 @@ void pumpControlActivateIfNeeded(int currentSoilMoisture, int currentWaterLevel)
         Serial.printf("  [Pompa] Niska wilgotność. Uruchamiam pompę automatycznie na %d ms...\n", pumpRunMillisDefault);
         digitalWrite(pumpPin, HIGH);
         isPumpOn = true;
-        delay(pumpRunMillisDefault);
-        digitalWrite(pumpPin, LOW);
-        isPumpOn = false;
-        Serial.println("  [Pompa] Pompa zatrzymana (automat).");
+        pumpStartTime = millis();
+        pumpTargetDuration = pumpRunMillisDefault; // Używamy zdefiniowanej zmiennej pumpRunMillisDefault
+        blynkUpdatePumpStatus(isPumpOn);
+        Serial.println("  [Pompa] Pompa uruchomiona (automat).");
+        // Usunięte natychmiastowe wyłączenie - pompa zostanie wyłączona przez pumpControlUpdate()
     } else if (currentSoilMoisture < 0) {
          Serial.println("  [Pompa] Błąd odczytu wilgotności gleby. Pompa nieaktywna.");
     } else {
@@ -58,7 +59,6 @@ void pumpControlActivateIfNeeded(int currentSoilMoisture, int currentWaterLevel)
     }
      Serial.println("---------------------------------");
 }
-
 void pumpControlManualTurnOn(uint32_t durationMillis) {
      if (pumpPin == 255) {
         Serial.println("  [Pompa] Błąd: Pin pompy nieskonfigurowany. Nie można włączyć manualnie.");
