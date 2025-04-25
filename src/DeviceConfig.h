@@ -39,4 +39,30 @@ void configSetPumpRunMillis(uint32_t durationMs);
 
 void configSetSoilThresholdPercent(int threshold);
 
+/**
+ * @brief Pobiera ustawioną godzinę codziennego pomiaru
+ * @return Godzina jako liczba 0-23
+ */
+int configGetMeasurementHour();
+
+/**
+ * @brief Pobiera ustawioną minutę codziennego pomiaru
+ * @return Minuta jako liczba 0-59
+ */
+int configGetMeasurementMinute();
+
+/**
+ * @brief Ustawia czas codziennego pomiaru
+ * @param hour Godzina (0-23)
+ * @param minute Minuta (0-59)
+ * @return true jeśli ustawiono poprawnie
+ */
+bool configSetMeasurementTime(int hour, int minute);
+
+/**
+ * @brief Ustawia i zapisuje tryb pracy urządzenia.
+ * @param enabled true dla trybu ciągłego, false dla trybu Deep Sleep.
+ */
+void configSetContinuousMode(bool enabled); // <-- Dodaj tę linię
+
 #endif // DEVICECONFIG_H

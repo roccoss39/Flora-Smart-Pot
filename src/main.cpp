@@ -16,6 +16,10 @@
 // #include "MotionSensor.h"   // <<--- ZAKOMENTOWANY LUB USUNIĘTY
 #include "PowerManager.h"
 
+
+#include <Preferences.h> 
+
+
 // Funkcja pomocnicza do drukowania przyczyny wybudzenia
 void print_wakeup_reason(){
   esp_sleep_wakeup_cause_t wakeup_reason;
@@ -42,6 +46,21 @@ unsigned long lastBlynkSend = 0;
 
 void setup() {
     Serial.begin(115200);
+
+// // ---------- POCZĄTEK NOWEGO KODU TYMCZASOWEGO ----------
+// Preferences temporaryPrefs;
+// // Użyj tej samej przestrzeni nazw co w DeviceConfig!
+// if (temporaryPrefs.begin("flaura_cfg_1", false)) { // false = tryb Read/Write
+//     Serial.println(">>> Nadpisywanie ustawienia 'contMode' w Preferences na 'TRUE'...");
+//     temporaryPrefs.putBool("contMode", false); // <-- Zapisz TRUE
+//     temporaryPrefs.end();
+//     Serial.println(">>> Zakończono nadpisywanie 'contMode' na TRUE.");
+// } else {
+//     Serial.println(">>> Błąd otwarcia Preferences do zapisu!");
+// }
+// // ---------- KONIEC NOWEGO KODU TYMCZASOWEGO -----------
+
+
     Serial.println("\n--- Flaura Smart Pot - Główny Start ---");
     print_wakeup_reason();
 
@@ -84,6 +103,7 @@ void setup() {
 
     if (runMeasurement) {
         Serial.println("\n--- Pierwszy pomiar/cykl po starcie/wybudzeniu ---");
+        Serial.printf("Tryb ciągły wczytany z pamięci: %s\n", configIsContinuousMode() ? "TAK" : "NIE");
         digitalWrite(LED_BUILTIN, HIGH);
 
         // Odczyty sensorów (bez MPU)
@@ -98,6 +118,9 @@ void setup() {
 
         // Wyświetl wyniki lokalnie
         Serial.println("--- Wyniki pomiarów ---");
+
+        Serial.printf("  Tryb ciągły: %s (false = Deep Sleep)\n", configIsContinuousMode() ? "TAK" : "NIE");
+        
         if(currentMoisture >= 0) Serial.printf("Wilgotność gleby: %d %%\n", currentMoisture); else Serial.println("Wilgotność gleby: Błąd odczytu");
         Serial.printf("Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS);
         if(currentBatteryVoltage > 0) Serial.printf("Napięcie baterii: %.2f V\n", currentBatteryVoltage); else Serial.println("Napięcie baterii: Błąd odczytu / Odłączona");
@@ -114,6 +137,8 @@ void setup() {
         // Spróbuj połączyć WiFi/Blynk jeśli potrzeba (np. po wybudzeniu)
         if (!wifiIsConnected()){ wifiConnect(SECRET_SSID, SECRET_PASS, 5000); }
         if (wifiIsConnected()) {
+            powerManagerSyncTime(); // Synchronizuj czas z NTP
+
             if (!blynkIsConnected()) { blynkConnect(3000); }
             // Wyślij dane (bez MPU)
              blynkSendSensorData(currentMoisture, currentWaterLevel, currentBatteryVoltage,
@@ -129,18 +154,24 @@ void setup() {
 
     // --- Przejście w Deep Sleep (tylko w tym trybie) ---
     if (!configIsContinuousMode()) {
-      // Sprawdź, czy pompa nie pracuje
-      if (pumpControlIsRunning()) {
-          Serial.println("Pompa pracuje - pozostaję w trybie aktywnym do zakończenia pracy pompy.");
-          // Przejdź do loop() zamiast deep sleep
-      } else {
-          digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
-          Serial.println("Rozłączam WiFi/Blynk i konfiguruję wybudzanie (tylko timer)...");
-          blynkDisconnect();
-          wifiDisconnect();
-          powerManagerGoToDeepSleep(); // Konfiguruje timer i idzie spać
-      }
+    // Sprawdź, czy pompa nie pracuje
+    if (pumpControlIsRunning()) {
+        Serial.println("Pompa pracuje - pozostaję w trybie aktywnym do zakończenia pracy pompy.");
+        // Przejdź do loop() zamiast deep sleep
     } else {
+        digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
+        Serial.println("Rozłączam WiFi/Blynk i konfiguruję wybudzanie...");
+        blynkDisconnect();
+        wifiDisconnect();
+        
+        // Debug info - sprawdź tryb
+        Serial.print("Tryb ciągły: ");
+        Serial.println(configIsContinuousMode() ? "TAK" : "NIE");
+        
+        // Go to deep sleep
+        powerManagerGoToDeepSleep(); // Konfiguruje timer i idzie spać
+    }
+  } else {
       Serial.println("Tryb ciągły aktywny. Dalsza praca w loop().");
   }
 } // Koniec setup()

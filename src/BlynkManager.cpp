@@ -3,6 +3,8 @@
 #include <Arduino.h> // Dla Serial
 #include "DeviceConfig.h" // Potrzebny do setterów konfiguracji
 #include "PumpControl.h"  // Potrzebny do manualnego sterowania pompą
+#include <Preferences.h> 
+
 
 // --- WAŻNE: Konfiguracja Wirtualnych Pinów Blynk ---
 // Ustaw tutaj numery VPIN zgodne z tym, co zdefiniowałeś w szablonie Blynk!
@@ -19,6 +21,11 @@
 #define BLYNK_VPIN_PUMP_MANUAL  V10 // Przycisk (Button Widget)
 #define BLYNK_VPIN_PUMP_DURATION V11 // Suwak/Pole numeryczne (np. Slider, Step, Numeric Input)
 #define BLYNK_VPIN_SOIL_THRESHOLD V12 // Suwak/Pole numeryczne
+
+#define BLYNK_VPIN_MEASUREMENT_HOUR V20
+#define BLYNK_VPIN_MEASUREMENT_MINUTE V21
+
+#define BLYNK_VPIN_CONTINUOUS_MODE V15 
 
 // Przekierowanie logów Blynk do Serial (opcjonalne)
 #define BLYNK_PRINT Serial
@@ -142,14 +149,75 @@ BLYNK_WRITE(BLYNK_VPIN_SOIL_THRESHOLD) {
 
 // Handler wywoływany po połączeniu z Blynk
 BLYNK_CONNECTED() {
-  Serial.println("Połączono z serwerem Blynk. Synchronizuję ustawienia...");
-  // Synchronizuj wartości z serwerem - odczyta aktualne ustawienia suwaków z Blynk
-  Blynk.syncVirtual(BLYNK_VPIN_PUMP_DURATION);
-  Blynk.syncVirtual(BLYNK_VPIN_SOIL_THRESHOLD);
-  // Można też zsynchronizować statusy wyjściowe, np. status pompy
-  Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, pumpControlIsRunning() ? 1 : 0);
-}
+    Serial.println("Połączono z serwerem Blynk. Synchronizuję ustawienia...");
+    // Istniejące synchronizacje...
+    Blynk.syncVirtual(BLYNK_VPIN_PUMP_DURATION);
+    Blynk.syncVirtual(BLYNK_VPIN_SOIL_THRESHOLD);
+    Blynk.syncVirtual(BLYNK_VPIN_MEASUREMENT_HOUR);
+    Blynk.syncVirtual(BLYNK_VPIN_MEASUREMENT_MINUTE);
+    Blynk.syncVirtual(BLYNK_VPIN_CONTINUOUS_MODE);
+  
+    // Istniejące aktualizacje VPIN...
+    Blynk.virtualWrite(BLYNK_VPIN_MEASUREMENT_HOUR, configGetMeasurementHour());
+    Blynk.virtualWrite(BLYNK_VPIN_MEASUREMENT_MINUTE, configGetMeasurementMinute());
+    Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, pumpControlIsRunning() ? 1 : 0);
+  
+    // --- Nowy kod synchronizacji trybu ---
+    // Preferences prefs;
+    // // Tylko do odczytu tym razem
+    // if (prefs.begin("flaura_cfg_1", true)) { // true = tryb Read-Only
+    //     bool currentMode = prefs.getBool("contMode", configIsContinuousMode()); // Odczytaj z prefs, użyj bieżącego jako fallback
+    //     prefs.end();
+    //     Serial.printf("Synchronizacja statusu V%d: Tryb ciągły = %s\n", BLYNK_VPIN_CONTINUOUS_MODE, currentMode ? "TAK" : "NIE");
+    //    // Blynk.virtualWrite(BLYNK_VPIN_CONTINUOUS_MODE, currentMode ? 1 : 0); // Ustaw stan przełącznika w apce
+    // } else {
+    //      Serial.println("Błąd otwarcia Preferences do odczytu stanu trybu!");
+    // }
+    // --- Koniec nowego kodu ---
+  }
 
 void blynkUpdatePumpStatus(bool isRunning) {
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, isRunning ? 1 : 0);
 }
+
+// Dodaj handlery dla tych pinów
+BLYNK_WRITE(BLYNK_VPIN_MEASUREMENT_HOUR) {
+    int newHour = param.asInt();
+    Serial.printf("Otrzymano nową godzinę pomiaru: %d\n", newHour);
+    int currentMinute = configGetMeasurementMinute();
+    configSetMeasurementTime(newHour, currentMinute);
+  }
+  
+  BLYNK_WRITE(BLYNK_VPIN_MEASUREMENT_MINUTE) {
+    int newMinute = param.asInt();
+    Serial.printf("Otrzymano nową minutę pomiaru: %d\n", newMinute);
+    int currentHour = configGetMeasurementHour();
+    configSetMeasurementTime(currentHour, newMinute);
+  }
+
+
+  // Handler dla przełącznika trybu ciągłego (VPIN V15)
+BLYNK_WRITE(BLYNK_VPIN_CONTINUOUS_MODE) {
+    bool isContinuous = param.asInt() == 1; // 1 = Włączony (Ciągły), 0 = Wyłączony (Deep Sleep)
+    Serial.printf("Otrzymano komendę zmiany trybu na V%d: %s\n",
+                  BLYNK_VPIN_CONTINUOUS_MODE, isContinuous ? "Ciągły (TRUE)" : "Deep Sleep (FALSE)");
+        
+    configSetContinuousMode(isContinuous);
+    // Preferences prefs;
+    // // Użyj tej samej przestrzeni nazw co w DeviceConfig!
+    // if (prefs.begin("flaura_cfg_1", false)) { // false = tryb Read/Write
+    //     prefs.putBool("contMode", isContinuous); // Zapisz nową wartość do Preferences
+    //     prefs.end();
+    //     Serial.println("Zapisano nowe ustawienie trybu w Preferences.");
+  
+    //     // Opcjonalnie: Zresetuj urządzenie, aby zmiana trybu zadziałała natychmiast
+    //     // Serial.println("Resetuję urządzenie, aby zastosować zmianę trybu...");
+    //     // delay(1000); // Daj czas na wysłanie logów
+    //     // ESP.restart();
+    //     // Uwaga: Restart może być problematyczny, jeśli np. pompa pracuje.
+    //     // Bez restartu zmiana trybu zostanie uwzględniona przy następnym uruchomieniu/wybudzeniu.
+  
+    // } else {
+    //     Serial.println("Błąd otwarcia Preferences do zapisu!");
+    // }
+  }

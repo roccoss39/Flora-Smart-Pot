@@ -6,6 +6,8 @@ Preferences preferences;
 const char* PREF_NAMESPACE = "flaura_cfg_1"; // Twoja przestrzeń nazw
 
 #define NUM_WATER_LEVELS_CONFIG 5
+#define PREF_MEASUREMENT_HOUR "meas_hour"  
+#define PREF_MEASUREMENT_MINUTE "meas_min"
 
 // --- Klucze dla Preferences ---
 const char* PREF_SOIL_PIN = "soilPin";
@@ -42,7 +44,7 @@ const uint8_t DEFAULT_DHT_PIN = 4;
 const uint8_t DEFAULT_MPU_INT_PIN = 33; // Domyślny pin dla przerwania MPU
 // General
 const uint32_t DEFAULT_SLEEP_SECONDS = 3600; // 1 godzina
-const bool DEFAULT_CONTINUOUS_MODE = false; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
+const bool DEFAULT_CONTINUOUS_MODE = true; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
 //Blynk
 const char* PREF_BLYNK_INTERVAL = "blynkInt";
 const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 30; // Domyślnie co 60 sekund
@@ -80,8 +82,8 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putUChar(PREF_BAT_ADC_PIN, DEFAULT_BAT_ADC_PIN);
         preferences.putUChar(PREF_DHT_PIN, DEFAULT_DHT_PIN);
         preferences.putUChar(PREF_MPU_INT_PIN, DEFAULT_MPU_INT_PIN); // Zapisz pin INT MPU
-        preferences.putUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS);
-        preferences.putBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
+        preferences.putUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS); 
+        preferences.putBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE); //?
         preferences.putUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
      }
 }
@@ -198,3 +200,36 @@ void configSetSoilThresholdPercent(int threshold) {
     }
 }
 
+
+int configGetMeasurementHour() {
+    preferences.begin(PREF_NAMESPACE, true); // Read-only mode
+    int hour = preferences.getInt(PREF_MEASUREMENT_HOUR, 8); // Default 8:00
+    preferences.end();
+    return hour;
+}
+
+int configGetMeasurementMinute() {
+    preferences.begin(PREF_NAMESPACE, true); // Read-only mode
+    int minute = preferences.getInt(PREF_MEASUREMENT_MINUTE, 0);
+    preferences.end();
+    return minute;
+}
+
+bool configSetMeasurementTime(int hour, int minute) {
+    if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
+        preferences.begin(PREF_NAMESPACE, false); // Read-write mode
+        preferences.putInt(PREF_MEASUREMENT_HOUR, hour);
+        preferences.putInt(PREF_MEASUREMENT_MINUTE, minute);
+        preferences.end();
+        return true;
+    }
+    return false;
+}
+
+void configSetContinuousMode(bool enabled)
+{
+    continuousMode = enabled;
+    preferences.begin(PREF_NAMESPACE, false); // Read-write mode
+    preferences.putInt(PREF_CONT_MODE, continuousMode);
+    preferences.end();
+}
