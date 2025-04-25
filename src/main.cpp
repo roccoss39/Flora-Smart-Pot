@@ -160,6 +160,7 @@ void loop() {
             }
         }
 
+        pumpControlUpdate();
         // Okresowe wysyłanie danych do Blynk
         uint32_t interval = configGetBlynkSendIntervalSec() * 1000;
         if (interval == 0) interval = 60000;

@@ -8,6 +8,9 @@ static uint32_t pumpRunMillisDefault;
 static int soilThreshold;
 static bool isPumpOn = false;
 
+static unsigned long pumpStartTime = 0;
+static uint32_t pumpTargetDuration = 0;
+
 void pumpControlSetup() {
     pumpPin = configGetPumpPin();
     pumpRunMillisDefault = configGetPumpRunMillis();
@@ -68,12 +71,14 @@ void pumpControlManualTurnOn(uint32_t durationMillis) {
      Serial.printf("  [Pompa] Uruchamiam pompę manualnie na %d ms...\n", durationMillis);
      digitalWrite(pumpPin, HIGH);
      isPumpOn = true;
+     pumpStartTime = millis();
+     pumpTargetDuration = durationMillis;
      blynkUpdatePumpStatus(isPumpOn);
-     delay(durationMillis);
-     digitalWrite(pumpPin, LOW);
-     isPumpOn = false;
-     blynkUpdatePumpStatus(isPumpOn);
-     Serial.println("  [Pompa] Pompa zatrzymana (manual).");
+     //delay(durationMillis);
+     //digitalWrite(pumpPin, LOW);
+     //isPumpOn = false;
+     //blynkUpdatePumpStatus(isPumpOn);
+     //Serial.println("  [Pompa] Pompa zatrzymana (manual).");
 }
 
 void pumpControlManualTurnOff() {
@@ -85,6 +90,7 @@ void pumpControlManualTurnOff() {
         Serial.println("  [Pompa] Manualne natychmiastowe wyłączenie pompy...");
         digitalWrite(pumpPin, LOW);
         isPumpOn = false;
+        blynkUpdatePumpStatus(isPumpOn);
     } else {
          Serial.println("  [Pompa] Pompa już jest wyłączona.");
     }
@@ -92,4 +98,14 @@ void pumpControlManualTurnOff() {
 
 bool pumpControlIsRunning() {
     return isPumpOn;
+}
+
+void pumpControlUpdate() {
+    // Sprawdź, czy pompa powinna zostać wyłączona
+    if (isPumpOn && (millis() - pumpStartTime >= pumpTargetDuration)) {
+        digitalWrite(pumpPin, LOW);
+        isPumpOn = false;
+        blynkUpdatePumpStatus(isPumpOn);
+        Serial.println("  [Pompa] Pompa zatrzymana (auto-wyłączenie po czasie).");
+    }
 }

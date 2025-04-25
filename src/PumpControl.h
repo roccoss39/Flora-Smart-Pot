@@ -32,4 +32,6 @@ void pumpControlManualTurnOff();
  */
 bool pumpControlIsRunning();
 
+void pumpControlUpdate(); // Nowa funkcja do regularnego wywoływania w loop()
+
 #endif // PUMPCONTROL_H
