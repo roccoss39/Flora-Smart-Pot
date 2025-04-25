@@ -149,3 +149,7 @@ BLYNK_CONNECTED() {
   // Można też zsynchronizować statusy wyjściowe, np. status pompy
   Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, pumpControlIsRunning() ? 1 : 0);
 }
+
+void blynkUpdatePumpStatus(bool isRunning) {
+    Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, isRunning ? 1 : 0);
+}

@@ -1,6 +1,7 @@
 #include "PumpControl.h"
 #include "DeviceConfig.h"
 #include <Arduino.h>
+#include "BlynkManager.h"
 
 static uint8_t pumpPin;
 static uint32_t pumpRunMillisDefault;
@@ -67,9 +68,11 @@ void pumpControlManualTurnOn(uint32_t durationMillis) {
      Serial.printf("  [Pompa] Uruchamiam pompę manualnie na %d ms...\n", durationMillis);
      digitalWrite(pumpPin, HIGH);
      isPumpOn = true;
+     blynkUpdatePumpStatus(isPumpOn);
      delay(durationMillis);
      digitalWrite(pumpPin, LOW);
      isPumpOn = false;
+     blynkUpdatePumpStatus(isPumpOn);
      Serial.println("  [Pompa] Pompa zatrzymana (manual).");
 }
 

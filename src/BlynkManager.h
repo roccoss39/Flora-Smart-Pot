@@ -44,6 +44,8 @@ void blynkDisconnect();
  */
 void blynkSendSensorData(int soil, int waterLvl, float batteryV, float temp, float humid, float tilt, bool tiltAlert, bool pumpStatus);
 
+void blynkUpdatePumpStatus(bool isRunning);
+
 // --- Funkcje obsługi zdarzeń z Blynk (przykłady) ---
 // Te funkcje zostaną automatycznie wywołane przez Blynk.run(), gdy coś się zmieni w aplikacji
 // BLYNK_CONNECTED() {
