@@ -68,5 +68,6 @@ void configSetContinuousMode(bool enabled); // <-- Dodaj tę linię
 uint8_t configGetBuzzerPin();
 int configGetLowBatteryMilliVolts(); // <-- DODAJ: Getter dla progu baterii (mV)
 int configGetLowSoilPercent();  
-
+bool configIsAlarmSoundEnabled();
+void configSetAlarmSoundEnabled(bool enabled);
 #endif // DEVICECONFIG_H

@@ -24,6 +24,7 @@ const char* PREF_MPU_INT_PIN = "mpuIntPin"; // Nowy klucz dla pinu INT MPU
 const char* PREF_SLEEP_SEC = "sleepSec";
 const char* PREF_CONT_MODE = "contMode";
 const char* PREF_BUZZER_PIN = "buzzerPin";
+const char* PREF_ALARM_SND_EN = "almSndEn";
 
 // --- Domyślne wartości konfiguracji ---
 // Soil Sensor - Twoje wartości, z kontrolą VCC
@@ -53,6 +54,11 @@ static uint32_t blynkSendIntervalSec;
 
 const uint8_t DEFAULT_BUZZER_PIN = 23; // Domyślny pin dla buzzera
 
+const bool DEFAULT_ALARM_SOUND_ENABLED = true;
+const int DEFAULT_LOW_BATTERY_MV = 2900; // Np. 3.3V
+const int DEFAULT_LOW_SOIL_PERCENT = 20; // Np. 20%
+
+
 // Zmienne statyczne
 static uint8_t soilSensorPin;
 static int soilAdcDry;
@@ -70,6 +76,7 @@ static bool continuousMode;
 static uint8_t buzzerPin;
 static int lowBatteryMilliVolts; // Deklaracja zmiennej dla progu baterii
 static int lowSoilPercent;  
+static bool alarmSoundEnabled;
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 void saveDefaultConfigurationIfNeeded() {
@@ -92,6 +99,14 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE); //?
         preferences.putUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
         preferences.putUChar(PREF_BUZZER_PIN, DEFAULT_BUZZER_PIN);
+        preferences.putBool(PREF_ALARM_SND_EN, DEFAULT_ALARM_SOUND_ENABLED);
+        preferences.putInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
+        preferences.putInt("lowSoilPct", DEFAULT_LOW_SOIL_PERCENT);
+
+               // UWAGA: Te progi powinny być konfigurowalne przez Blynk w przyszłości
+            //    preferences.putInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
+            //    preferences.putInt("lowSoilPct", DEFAULT_LOW_SOIL_PERCENT);
+
      }
 }
 
@@ -117,6 +132,9 @@ void configSetup() {
     continuousMode = preferences.getBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
     blynkSendIntervalSec = preferences.getUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
     buzzerPin = preferences.getUChar(PREF_BUZZER_PIN, DEFAULT_BUZZER_PIN);
+    alarmSoundEnabled = preferences.getBool(PREF_ALARM_SND_EN, DEFAULT_ALARM_SOUND_ENABLED);
+    lowBatteryMilliVolts = preferences.getInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
+    lowSoilPercent = preferences.getInt("lowSoilPct", DEFAULT_LOW_SOIL_PERCENT);
 
     preferences.end();
 
@@ -140,6 +158,10 @@ void configSetup() {
     Serial.printf("  Czas uśpienia: %d s\n", sleepDurationSeconds);
     Serial.printf("  Interwał wysyłania Blynk: %d s\n", blynkSendIntervalSec);
     Serial.printf("  Pin Buzzera: %d\n", buzzerPin);
+    Serial.printf("  Dźwięk alarmu włączony: %s\n", alarmSoundEnabled ? "TAK" : "NIE");
+    Serial.printf("  Próg alarmu niskiej baterii: %d mV\n", lowBatteryMilliVolts);
+    Serial.printf("  Próg alarmu niskiej wilg. gleby: %d %%\n", lowSoilPercent);
+
 
     Serial.println("--------------------");
 }
@@ -159,6 +181,7 @@ uint8_t configGetDhtPin() { return dhtPin; }
 uint8_t configGetMpuIntPin() { return mpuIntPin; } // Getter dla pinu INT MPU
 uint32_t configGetBlynkSendIntervalSec() { return blynkSendIntervalSec; }
 uint8_t configGetBuzzerPin() { return buzzerPin; }
+bool configIsAlarmSoundEnabled() { return alarmSoundEnabled; }
 
 uint8_t configGetWaterLevelPin(int level) {
     if (level >= 1 && level <= NUM_WATER_LEVELS_CONFIG) {
@@ -191,8 +214,6 @@ void configSetPumpRunMillis(uint32_t durationMs) {
         Serial.printf("Zapisano nowy czas pracy pompy: %d ms\n", pumpRunMillis);
     }
 }
-
-
 /**
  * @brief Ustawia i zapisuje nowy próg wilgotności gleby.
  */
@@ -254,4 +275,14 @@ int configGetLowSoilPercent() {
     // Zwraca wartość zmiennej statycznej przechowującej próg
     // Upewnij się, że zmienna 'lowSoilPercent' jest zadeklarowana statycznie wyżej w tym pliku
     return lowSoilPercent;
+}
+
+void configSetAlarmSoundEnabled(bool enabled) {
+    if (alarmSoundEnabled != enabled) {
+        alarmSoundEnabled = enabled;
+        preferences.begin(PREF_NAMESPACE, false);
+        preferences.putBool(PREF_ALARM_SND_EN, alarmSoundEnabled);
+        preferences.end();
+        Serial.printf("Zapisano nowy stan dźwięku alarmu: %s\n", alarmSoundEnabled ? "Włączony" : "Wyłączony");
+    }
 }

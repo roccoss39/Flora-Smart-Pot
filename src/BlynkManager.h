@@ -46,29 +46,7 @@ void blynkSendSensorData(int soil, int waterLvl, float batteryV, float temp, flo
 
 void blynkUpdatePumpStatus(bool isRunning);
 
-void blynkUpdateAlarmStatus(bool isAlarm);
-// --- Funkcje obsługi zdarzeń z Blynk (przykłady) ---
-// Te funkcje zostaną automatycznie wywołane przez Blynk.run(), gdy coś się zmieni w aplikacji
-// BLYNK_CONNECTED() {
-//   Serial.println("Połączono z Blynk!");
-//   // Synchronizuj stan przycisków/suwaków przy połączeniu
-//   // Blynk.syncVirtual(VPIN_PUMP_MANUAL_BUTTON);
-// }
-
-// BLYNK_WRITE(VPIN_PUMP_MANUAL_BUTTON) { // VPIN dla przycisku manualnego
-//   int value = param.asInt();
-//   if (value == 1) {
-//     // Uruchom pompę manualnie na domyślny czas
-//     pumpControlManualTurnOn(configGetPumpRunMillis());
-//   }
-// }
-
-// BLYNK_WRITE(VPIN_PUMP_DURATION_SLIDER) { // VPIN dla suwaka czasu
-//    uint32_t newDuration = param.asInt();
-//    Serial.printf("Otrzymano nowy czas pracy pompy: %d ms\n", newDuration);
-//    // Tutaj zapisz nową wartość do Preferences (np. za pomocą funkcji z DeviceConfig)
-//    // configSetPumpRunMillis(newDuration); // Trzeba by dodać taką funkcję
-// }
+void blynkUpdateAlarmSoundEnableWidget(bool enabled);
 
 
 #endif // BLYNKMANAGER_H
