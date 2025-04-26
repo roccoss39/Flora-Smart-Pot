@@ -119,6 +119,19 @@ void setup() {
 
         digitalWrite(LED_BUILTIN, LOW);
 
+       if (alarmManagerIsAlarmActive()) {
+              Serial.println("[SETUP] Wykryto aktywny alarm!");
+               // Jeśli aktualny tryb to NIE ciągły (czyli Deep Sleep)
+              if (!configIsContinuousMode()) {
+                   Serial.println("[SETUP] Przełączam na tryb ciągły z powodu alarmu...");
+                   configSetContinuousMode(true); // Użyj settera, aby zapisać zmianę w Preferences i RAM
+                 
+              } else {
+                   Serial.println("[SETUP] Już w trybie ciągłym z powodu alarmu.");
+               }
+           }
+           // --- KONIEC LOGIKI ZMIANY TRYBU ---
+
         // Wyświetl wyniki lokalnie
         Serial.println("--- Wyniki pomiarów ---");
 
@@ -181,6 +194,11 @@ void setup() {
 
 
 void loop() {
+
+    static int lastMoisture = -1; 
+    static int lastWaterLevel = -1; 
+    static float lastBatteryVoltage = -1.0;
+
     if (configIsContinuousMode()) {
         // --- TRYB CIĄGŁY ---
         // Obsługa Blynk
@@ -215,8 +233,12 @@ void loop() {
             float currentTemperatureDHT;
             float currentHumidityDHT;
             bool dhtOk = environmentSensorRead(currentTemperatureDHT, currentHumidityDHT);
+            
+            lastMoisture = currentMoisture;
+            lastWaterLevel = currentWaterLevel;
+            lastBatteryVoltage = currentBatteryVoltage;
 
-            alarmManagerUpdate(currentWaterLevel, currentBatteryVoltage, currentMoisture);
+        //    alarmManagerUpdate(currentWaterLevel, currentBatteryVoltage, currentMoisture);
             
             digitalWrite(LED_BUILTIN, LOW);
 
@@ -266,4 +288,5 @@ void loop() {
           delay(1000); // Krótkie opóźnienie, aby nie generować zbyt wielu logów
       }
   }
+  alarmManagerUpdate(lastWaterLevel, lastBatteryVoltage, lastMoisture);
 } // Koniec loop()

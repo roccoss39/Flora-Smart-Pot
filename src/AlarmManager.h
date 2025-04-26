@@ -15,4 +15,6 @@ void alarmManagerSetup();
  */
 void alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture);
 
+bool alarmManagerIsAlarmActive(); // <-- Dodaj tę deklarację
+
 #endif // ALARMMANAGER_H

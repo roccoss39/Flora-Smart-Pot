@@ -109,3 +109,8 @@ void alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture) 
         }
     }
 }
+
+bool alarmManagerIsAlarmActive() {
+    // Po prostu zwróć aktualną wartość flagi ustawianej w alarmManagerUpdate
+    return isAlarmActive;
+}

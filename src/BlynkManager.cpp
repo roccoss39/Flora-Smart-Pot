@@ -4,6 +4,7 @@
 #include "DeviceConfig.h" // Potrzebny do setterów konfiguracji
 #include "PumpControl.h"  // Potrzebny do manualnego sterowania pompą
 #include <Preferences.h> 
+#include <AlarmManager.h>
 
 
 // --- WAŻNE: Konfiguracja Wirtualnych Pinów Blynk ---
@@ -155,25 +156,17 @@ BLYNK_CONNECTED() {
     Blynk.syncVirtual(BLYNK_VPIN_SOIL_THRESHOLD);
     Blynk.syncVirtual(BLYNK_VPIN_MEASUREMENT_HOUR);
     Blynk.syncVirtual(BLYNK_VPIN_MEASUREMENT_MINUTE);
+    if (!alarmManagerIsAlarmActive())
     Blynk.syncVirtual(BLYNK_VPIN_CONTINUOUS_MODE);
+    else 
+    Blynk.virtualWrite(BLYNK_VPIN_CONTINUOUS_MODE, configIsContinuousMode());
+  
   
     // Istniejące aktualizacje VPIN...
     Blynk.virtualWrite(BLYNK_VPIN_MEASUREMENT_HOUR, configGetMeasurementHour());
     Blynk.virtualWrite(BLYNK_VPIN_MEASUREMENT_MINUTE, configGetMeasurementMinute());
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, pumpControlIsRunning() ? 1 : 0);
-  
-    // --- Nowy kod synchronizacji trybu ---
-    // Preferences prefs;
-    // // Tylko do odczytu tym razem
-    // if (prefs.begin("flaura_cfg_1", true)) { // true = tryb Read-Only
-    //     bool currentMode = prefs.getBool("contMode", configIsContinuousMode()); // Odczytaj z prefs, użyj bieżącego jako fallback
-    //     prefs.end();
-    //     Serial.printf("Synchronizacja statusu V%d: Tryb ciągły = %s\n", BLYNK_VPIN_CONTINUOUS_MODE, currentMode ? "TAK" : "NIE");
-    //    // Blynk.virtualWrite(BLYNK_VPIN_CONTINUOUS_MODE, currentMode ? 1 : 0); // Ustaw stan przełącznika w apce
-    // } else {
-    //      Serial.println("Błąd otwarcia Preferences do odczytu stanu trybu!");
-    // }
-    // --- Koniec nowego kodu ---
+
   }
 
 void blynkUpdatePumpStatus(bool isRunning) {
@@ -203,21 +196,9 @@ BLYNK_WRITE(BLYNK_VPIN_CONTINUOUS_MODE) {
                   BLYNK_VPIN_CONTINUOUS_MODE, isContinuous ? "Ciągły (TRUE)" : "Deep Sleep (FALSE)");
         
     configSetContinuousMode(isContinuous);
-    // Preferences prefs;
-    // // Użyj tej samej przestrzeni nazw co w DeviceConfig!
-    // if (prefs.begin("flaura_cfg_1", false)) { // false = tryb Read/Write
-    //     prefs.putBool("contMode", isContinuous); // Zapisz nową wartość do Preferences
-    //     prefs.end();
-    //     Serial.println("Zapisano nowe ustawienie trybu w Preferences.");
-  
-    //     // Opcjonalnie: Zresetuj urządzenie, aby zmiana trybu zadziałała natychmiast
-    //     // Serial.println("Resetuję urządzenie, aby zastosować zmianę trybu...");
-    //     // delay(1000); // Daj czas na wysłanie logów
-    //     // ESP.restart();
-    //     // Uwaga: Restart może być problematyczny, jeśli np. pompa pracuje.
-    //     // Bez restartu zmiana trybu zostanie uwzględniona przy następnym uruchomieniu/wybudzeniu.
-  
-    // } else {
-    //     Serial.println("Błąd otwarcia Preferences do zapisu!");
-    // }
+  }
+
+  void blynkUpdateAlarmStatus(bool isAlarm)
+  {
+
   }
