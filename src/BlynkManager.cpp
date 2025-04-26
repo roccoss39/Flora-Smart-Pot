@@ -22,6 +22,8 @@
 #define BLYNK_VPIN_PUMP_MANUAL  V10 // Przycisk
 #define BLYNK_VPIN_PUMP_DURATION V11 // Suwak/Input (ms)
 #define BLYNK_VPIN_SOIL_THRESHOLD V12 // Suwak/Input (%)
+#define BLYNK_VPIN_ALARM_BAT_THRESHOLD V13 // Suwak/Input (mV) - WYBIERZ WOLNY PIN!
+#define BLYNK_VPIN_ALARM_SOIL_THRESHOLD V14 // Suwak/Input (%) - WYBIERZ WOLNY PIN!
 #define BLYNK_VPIN_CONTINUOUS_MODE V15 // Przełącznik (Switch)
 #define BLYNK_VPIN_ALARM_SOUND_ENABLE V16 // Przełącznik (Switch)
 
@@ -170,14 +172,14 @@ BLYNK_CONNECTED() {
     Blynk.syncVirtual(BLYNK_VPIN_MEASUREMENT_HOUR);
     Blynk.syncVirtual(BLYNK_VPIN_MEASUREMENT_MINUTE);
     Blynk.syncVirtual(BLYNK_VPIN_ALARM_SOUND_ENABLE);
+    Blynk.syncVirtual(BLYNK_VPIN_ALARM_BAT_THRESHOLD);
+    Blynk.syncVirtual(BLYNK_VPIN_ALARM_SOIL_THRESHOLD);
 
     if (!alarmManagerIsAlarmActive())
     Blynk.syncVirtual(BLYNK_VPIN_CONTINUOUS_MODE);
     else
     Blynk.virtualWrite(BLYNK_VPIN_CONTINUOUS_MODE, configIsContinuousMode());
 
-
-    // Nie ma sensu synchronizować VPIN_ALARM_STATUS, bo to tylko wskaźnik stanu odczytanego z urządzenia
 
     // Aktualizuj wartości widgetów na podstawie bieżącej konfiguracji
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_DURATION, configGetPumpRunMillis());
@@ -186,10 +188,11 @@ BLYNK_CONNECTED() {
     Blynk.virtualWrite(BLYNK_VPIN_MEASUREMENT_MINUTE, configGetMeasurementMinute());
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_SOUND_ENABLE, configIsAlarmSoundEnabled() ? 1 : 0);
 
+    Blynk.virtualWrite(BLYNK_VPIN_ALARM_BAT_THRESHOLD, configGetLowBatteryMilliVolts());
+    Blynk.virtualWrite(BLYNK_VPIN_ALARM_SOIL_THRESHOLD, configGetLowSoilPercent());
+
     // <<< NOWOŚĆ: Aktualizuj wskaźnik alarmu przy połączeniu >>>
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_STATUS, alarmManagerIsAlarmActive() ? 1 : 0); //
-
-    // Aktualizuj status pompy
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, pumpControlIsRunning() ? 1 : 0);
     Serial.println("[Blynk] Synchronizacja zakończona.");
 }
@@ -202,6 +205,15 @@ void blynkUpdatePumpStatus(bool isRunning) {
     }
 }
 
-// Funkcja blynkUpdateAlarmStatus(bool isAlarm) nie jest już potrzebna,
-// ponieważ stan alarmu jest teraz wysyłany w blynkSendSensorData.
-// Można ją usunąć z pliku .h i .cpp.
+BLYNK_WRITE(BLYNK_VPIN_ALARM_BAT_THRESHOLD) {
+  int newThresholdMv = param.asInt();
+  Serial.printf("[Blynk] Otrzymano nowy próg alarmu baterii na V%d: %d mV\n", BLYNK_VPIN_ALARM_BAT_THRESHOLD, newThresholdMv);
+  configSetLowBatteryMilliVolts(newThresholdMv);
+}
+
+// Handler dla zmiany progu alarmu wilgotności gleby (%)
+BLYNK_WRITE(BLYNK_VPIN_ALARM_SOIL_THRESHOLD) {
+  int newThresholdPercent = param.asInt();
+  Serial.printf("[Blynk] Otrzymano nowy próg alarmu wilg. gleby na V%d: %d %%\n", BLYNK_VPIN_ALARM_SOIL_THRESHOLD, newThresholdPercent);
+  configSetLowSoilPercent(newThresholdPercent);
+}

@@ -25,6 +25,8 @@ const char* PREF_SLEEP_SEC = "sleepSec";
 const char* PREF_CONT_MODE = "contMode";
 const char* PREF_BUZZER_PIN = "buzzerPin";
 const char* PREF_ALARM_SND_EN = "almSndEn";
+const char* PREF_LOW_BAT_MV = "lowBatMv";
+const char* PREF_LOW_SOIL_PCT = "lowSoilPct";
 
 // --- Domyślne wartości konfiguracji ---
 // Soil Sensor - Twoje wartości, z kontrolą VCC
@@ -100,8 +102,8 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
         preferences.putUChar(PREF_BUZZER_PIN, DEFAULT_BUZZER_PIN);
         preferences.putBool(PREF_ALARM_SND_EN, DEFAULT_ALARM_SOUND_ENABLED);
-        preferences.putInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
-        preferences.putInt("lowSoilPct", DEFAULT_LOW_SOIL_PERCENT);
+        preferences.putInt(PREF_LOW_BAT_MV, DEFAULT_LOW_BATTERY_MV);
+        preferences.putInt(PREF_LOW_SOIL_PCT, DEFAULT_LOW_SOIL_PERCENT);
 
                // UWAGA: Te progi powinny być konfigurowalne przez Blynk w przyszłości
             //    preferences.putInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
@@ -133,8 +135,8 @@ void configSetup() {
     blynkSendIntervalSec = preferences.getUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
     buzzerPin = preferences.getUChar(PREF_BUZZER_PIN, DEFAULT_BUZZER_PIN);
     alarmSoundEnabled = preferences.getBool(PREF_ALARM_SND_EN, DEFAULT_ALARM_SOUND_ENABLED);
-    lowBatteryMilliVolts = preferences.getInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
-    lowSoilPercent = preferences.getInt("lowSoilPct", DEFAULT_LOW_SOIL_PERCENT);
+    lowBatteryMilliVolts = preferences.getInt(PREF_LOW_BAT_MV, DEFAULT_LOW_BATTERY_MV);
+    lowSoilPercent = preferences.getInt(PREF_LOW_SOIL_PCT, DEFAULT_LOW_SOIL_PERCENT);
 
     preferences.end();
 
@@ -284,5 +286,37 @@ void configSetAlarmSoundEnabled(bool enabled) {
         preferences.putBool(PREF_ALARM_SND_EN, alarmSoundEnabled);
         preferences.end();
         Serial.printf("Zapisano nowy stan dźwięku alarmu: %s\n", alarmSoundEnabled ? "Włączony" : "Wyłączony");
+    }
+}
+
+void configSetLowBatteryMilliVolts(int mv) {
+    // Prosta walidacja - np. między 2.5V a 4.2V
+    if (mv < 2500) mv = 2500;
+    if (mv > 4200) mv = 4200;
+
+    if (lowBatteryMilliVolts != mv) {
+        lowBatteryMilliVolts = mv; // Zaktualizuj wartość w RAM
+        preferences.begin(PREF_NAMESPACE, false); // Otwórz R/W
+        preferences.putInt(PREF_LOW_BAT_MV, lowBatteryMilliVolts); // Zapisz nową wartość do Flash
+        preferences.end(); // Zamknij
+        Serial.printf("[Config] Zapisano nowy próg alarmu baterii: %d mV\n", lowBatteryMilliVolts);
+    }
+}
+
+/**
+ * @brief Ustawia i zapisuje próg alarmu niskiej wilgotności gleby.
+ * @param percent Próg w procentach (0-100).
+ */
+void configSetLowSoilPercent(int percent) {
+    // Walidacja wartości (0-100 %)
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
+
+    if (lowSoilPercent != percent) { // Zapisz tylko jeśli wartość się zmieniła
+        lowSoilPercent = percent; // Zaktualizuj wartość w RAM
+        preferences.begin(PREF_NAMESPACE, false); // Otwórz R/W
+        preferences.putInt(PREF_LOW_SOIL_PCT, lowSoilPercent); // Zapisz do Flash
+        preferences.end(); // Zamknij
+        Serial.printf("[Config] Zapisano nowy próg alarmu wilgotności gleby: %d %%\n", lowSoilPercent);
     }
 }

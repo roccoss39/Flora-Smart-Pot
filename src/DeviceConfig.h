@@ -70,4 +70,6 @@ int configGetLowBatteryMilliVolts(); // <-- DODAJ: Getter dla progu baterii (mV)
 int configGetLowSoilPercent();  
 bool configIsAlarmSoundEnabled();
 void configSetAlarmSoundEnabled(bool enabled);
+void configSetLowBatteryMilliVolts(int mv);
+void configSetLowSoilPercent(int percent); // Próg dla alarmu wilgotności
 #endif // DEVICECONFIG_H
