@@ -176,10 +176,15 @@ BLYNK_CONNECTED() {
     Blynk.syncVirtual(BLYNK_VPIN_ALARM_SOIL_THRESHOLD);
 
     if (!alarmManagerIsAlarmActive())
-    Blynk.syncVirtual(BLYNK_VPIN_CONTINUOUS_MODE);
+    {
+      Serial.printf("[Blynk] Brak aktywnego alarmu. Synchronizuję stan V%d (ContinuousMode) z serwera...\n", BLYNK_VPIN_CONTINUOUS_MODE);
+      Blynk.syncVirtual(BLYNK_VPIN_CONTINUOUS_MODE);
+    }
     else
-    Blynk.virtualWrite(BLYNK_VPIN_CONTINUOUS_MODE, configIsContinuousMode());
-
+    {
+      Serial.printf("[Blynk] Alarm jest AKTYWNY! Wysyłam aktualny stan urządzenia (%s) do V%d (ContinuousMode)...\n", configIsContinuousMode() ? "CIĄGŁY" : "DEEP SLEEP", BLYNK_VPIN_CONTINUOUS_MODE);
+      Blynk.virtualWrite(BLYNK_VPIN_CONTINUOUS_MODE, configIsContinuousMode());
+    }
 
     // Aktualizuj wartości widgetów na podstawie bieżącej konfiguracji
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_DURATION, configGetPumpRunMillis());
