@@ -5,6 +5,12 @@
 #include <esp_sleep.h>
 #include <time.h>
 
+#include "driver/rtc_io.h" // <-- Dodaj ten include dla funkcji rtc_gpio_...
+#include "soc/rtc.h"       // <-- Dodaj ten include dla esp_sleep_pd_config
+
+#define BUTTON_PIN 32       // Pin RTC GPIO (SENSOR VP)
+#define WAKEUP_LEVEL 0      // Wybudzanie stanem LOW
+
 // Konfiguracja NTP
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;  // Strefa czasowa UTC+1 (dla Polski)
@@ -94,8 +100,34 @@ void powerManagerGoToDeepSleep() {
     // Konfiguracja wybudzania timerem
     esp_sleep_enable_timer_wakeup(sleepDurationUs);
 
+    powerManagerConfigureButtonWakeup();
+
     // Przejdź w Deep Sleep
     esp_deep_sleep_start();
 
     // Ten kod nigdy nie zostanie wykonany
+}
+
+void powerManagerConfigureButtonWakeup() {
+    // Używamy definicji z góry pliku:
+    // #define BUTTON_PIN 32
+    // #define WAKEUP_LEVEL 0
+
+    Serial.printf("Konfiguruję wybudzanie EXT0 na GPIO %d, poziom: %d (z wewn. pull-up)\n", BUTTON_PIN, WAKEUP_LEVEL);
+
+    // 1. Włącz wewnętrzny pull-up
+    esp_err_t pullup_result = rtc_gpio_pullup_en((gpio_num_t)BUTTON_PIN);
+    if (pullup_result != ESP_OK) {
+        Serial.printf("Błąd włączenia wewn. pull-up dla GPIO %d: %s\n", BUTTON_PIN, esp_err_to_name(pullup_result));
+    }
+    rtc_gpio_pulldown_dis((gpio_num_t)BUTTON_PIN);
+
+    // 2. Włącz wybudzanie EXT0
+    esp_err_t ext0_result = esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_PIN, WAKEUP_LEVEL);
+    if (ext0_result != ESP_OK) {
+         Serial.printf("Błąd konfiguracji EXT0: %s\n", esp_err_to_name(ext0_result));
+    }
+
+    // 3. Utrzymaj zasilanie RTC Peripherals
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 }

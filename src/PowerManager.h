@@ -26,4 +26,6 @@ uint64_t powerManagerGetTimeToNextMeasurement();
  */
 void powerManagerPrintCurrentTime();
 
+void powerManagerConfigureButtonWakeup();
+
 #endif // POWERMANAGER_H
