@@ -15,7 +15,7 @@
 #include "EnvironmentSensor.h" // Dla DHT11
 // #include "MotionSensor.h"   // <<--- ZAKOMENTOWANY LUB USUNIĘTY
 #include "PowerManager.h"
-
+#include "AlarmManager.h"
 
 #include <Preferences.h> 
 
@@ -78,6 +78,7 @@ void setup() {
     pumpControlSetup();
     batteryMonitorSetup();
     environmentSensorSetup();
+    alarmManagerSetup();
     // motionSensorSetup(); // <<--- ZAKOMENTOWANE LUB USUNIĘTE
 
     digitalWrite(LED_BUILTIN, LOW); // Zgaś po inicjalizacji
@@ -113,6 +114,8 @@ void setup() {
         float currentTemperatureDHT;
         float currentHumidityDHT;
         bool dhtOk = environmentSensorRead(currentTemperatureDHT, currentHumidityDHT);
+
+        alarmManagerUpdate(currentWaterLevel, currentBatteryVoltage, currentMoisture);
 
         digitalWrite(LED_BUILTIN, LOW);
 
@@ -213,6 +216,8 @@ void loop() {
             float currentHumidityDHT;
             bool dhtOk = environmentSensorRead(currentTemperatureDHT, currentHumidityDHT);
 
+            alarmManagerUpdate(currentWaterLevel, currentBatteryVoltage, currentMoisture);
+            
             digitalWrite(LED_BUILTIN, LOW);
 
             // Wyświetlanie lokalne

@@ -65,4 +65,8 @@ bool configSetMeasurementTime(int hour, int minute);
  */
 void configSetContinuousMode(bool enabled); // <-- Dodaj tę linię
 
+uint8_t configGetBuzzerPin();
+int configGetLowBatteryMilliVolts(); // <-- DODAJ: Getter dla progu baterii (mV)
+int configGetLowSoilPercent();  
+
 #endif // DEVICECONFIG_H

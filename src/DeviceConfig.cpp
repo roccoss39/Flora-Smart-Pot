@@ -23,6 +23,7 @@ const char* PREF_DHT_PIN = "dhtPin";
 const char* PREF_MPU_INT_PIN = "mpuIntPin"; // Nowy klucz dla pinu INT MPU
 const char* PREF_SLEEP_SEC = "sleepSec";
 const char* PREF_CONT_MODE = "contMode";
+const char* PREF_BUZZER_PIN = "buzzerPin";
 
 // --- Domyślne wartości konfiguracji ---
 // Soil Sensor - Twoje wartości, z kontrolą VCC
@@ -50,6 +51,8 @@ const char* PREF_BLYNK_INTERVAL = "blynkInt";
 const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 30; // Domyślnie co 60 sekund
 static uint32_t blynkSendIntervalSec;
 
+const uint8_t DEFAULT_BUZZER_PIN = 23; // Domyślny pin dla buzzera
+
 // Zmienne statyczne
 static uint8_t soilSensorPin;
 static int soilAdcDry;
@@ -64,6 +67,9 @@ static uint8_t dhtPin;
 static uint8_t mpuIntPin; // Zmienna dla pinu INT MPU
 static uint32_t sleepDurationSeconds;
 static bool continuousMode;
+static uint8_t buzzerPin;
+static int lowBatteryMilliVolts; // Deklaracja zmiennej dla progu baterii
+static int lowSoilPercent;  
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 void saveDefaultConfigurationIfNeeded() {
@@ -85,6 +91,7 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS); 
         preferences.putBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE); //?
         preferences.putUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
+        preferences.putUChar(PREF_BUZZER_PIN, DEFAULT_BUZZER_PIN);
      }
 }
 
@@ -109,6 +116,7 @@ void configSetup() {
     sleepDurationSeconds = preferences.getUInt(PREF_SLEEP_SEC, DEFAULT_SLEEP_SECONDS);
     continuousMode = preferences.getBool(PREF_CONT_MODE, DEFAULT_CONTINUOUS_MODE);
     blynkSendIntervalSec = preferences.getUInt(PREF_BLYNK_INTERVAL, DEFAULT_BLYNK_SEND_INTERVAL_SEC);
+    buzzerPin = preferences.getUChar(PREF_BUZZER_PIN, DEFAULT_BUZZER_PIN);
 
     preferences.end();
 
@@ -131,6 +139,7 @@ void configSetup() {
     Serial.printf("  Pin INT MPU6500: %d\n", mpuIntPin); // Wydrukuj pin INT MPU
     Serial.printf("  Czas uśpienia: %d s\n", sleepDurationSeconds);
     Serial.printf("  Interwał wysyłania Blynk: %d s\n", blynkSendIntervalSec);
+    Serial.printf("  Pin Buzzera: %d\n", buzzerPin);
 
     Serial.println("--------------------");
 }
@@ -149,6 +158,7 @@ uint8_t configGetBatteryAdcPin() { return batteryAdcPin; }
 uint8_t configGetDhtPin() { return dhtPin; }
 uint8_t configGetMpuIntPin() { return mpuIntPin; } // Getter dla pinu INT MPU
 uint32_t configGetBlynkSendIntervalSec() { return blynkSendIntervalSec; }
+uint8_t configGetBuzzerPin() { return buzzerPin; }
 
 uint8_t configGetWaterLevelPin(int level) {
     if (level >= 1 && level <= NUM_WATER_LEVELS_CONFIG) {
@@ -232,4 +242,16 @@ void configSetContinuousMode(bool enabled)
     preferences.begin(PREF_NAMESPACE, false); // Read-write mode
     preferences.putBool(PREF_CONT_MODE, continuousMode);
     preferences.end();
+}
+
+int configGetLowBatteryMilliVolts() {
+    // Zwraca wartość zmiennej statycznej przechowującej próg
+    // Upewnij się, że zmienna 'lowBatteryMilliVolts' jest zadeklarowana statycznie wyżej w tym pliku
+    return lowBatteryMilliVolts;
+}
+
+int configGetLowSoilPercent() {
+    // Zwraca wartość zmiennej statycznej przechowującej próg
+    // Upewnij się, że zmienna 'lowSoilPercent' jest zadeklarowana statycznie wyżej w tym pliku
+    return lowSoilPercent;
 }
