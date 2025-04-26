@@ -230,6 +230,6 @@ void configSetContinuousMode(bool enabled)
 {
     continuousMode = enabled;
     preferences.begin(PREF_NAMESPACE, false); // Read-write mode
-    preferences.putInt(PREF_CONT_MODE, continuousMode);
+    preferences.putBool(PREF_CONT_MODE, continuousMode);
     preferences.end();
 }
