@@ -1,116 +1,137 @@
 #include "AlarmManager.h"
 #include <Arduino.h>
-#include "DeviceConfig.h" // Potrzebny do pobrania pinów i progów
+#include "DeviceConfig.h"
 
 static uint8_t buzzerPin;
-static bool isAlarmActive = false; // Ogólny stan alarmu
-static unsigned long lastBeepTime = 0;
-const unsigned long BEEP_INTERVAL = 3000; // Interwał pikania w ms (3 sekundy)
-const int BEEP_DURATION = 150;           // Czas trwania pikania w ms
+static bool isAlarmActive = false;
+static unsigned long lastBeepCycleTime = 0;
+static unsigned long lastSingleBeepTime = 0;
+static const unsigned long BEEP_INTERVAL = 10000;    // Przerwa między cyklami (ms)
+static const unsigned long BEEP_DURATION = 300;     // Długość pojedynczego pikania (ms)
+static const unsigned long BEEP_PAUSE = 400;         // Pauza między piknięciami w cyklu (ms)
 
-// Flagi dla poszczególnych przyczyn alarmu (dla logowania)
 static bool lowWaterAlarm = false;
 static bool lowBatteryAlarm = false;
 static bool lowSoilAlarm = false;
 
+static int beepCount = 0;           // Ile piknięć ma być w tym cyklu
+static int beepsRemaining = 0;       // Ile piknięć zostało do wykonania
+static bool buzzerOn = false;        // Czy buzzer jest aktualnie włączony
+static unsigned long buzzerStateChangeTime = 0; // Czas ostatniej zmiany stanu buzzera
+
 void alarmManagerSetup() {
     buzzerPin = configGetBuzzerPin();
-    if (buzzerPin != 255) { // Używamy 255 jako wskaźnik błędu/braku konfiguracji
+    if (buzzerPin != 255) {
         pinMode(buzzerPin, OUTPUT);
-        digitalWrite(buzzerPin, LOW); // Upewnij się, że buzzer jest cicho na starcie
+        digitalWrite(buzzerPin, LOW);
         Serial.printf("  [Alarm] Skonfigurowano pin Buzzera: %d\n", buzzerPin);
     } else {
         Serial.println("  [Alarm] OSTRZEŻENIE: Pin Buzzera nie jest skonfigurowany!");
     }
-    // Reset stanów przy inicjalizacji
     isAlarmActive = false;
     lowWaterAlarm = false;
     lowBatteryAlarm = false;
     lowSoilAlarm = false;
-    lastBeepTime = 0;
+    lastBeepCycleTime = 0;
 }
 
-// Zmieniono argumenty funkcji:
 void alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture) {
     if (buzzerPin == 255) {
-        return; // Nie rób nic, jeśli pin nie jest skonfigurowany
+        return;
     }
 
-    // Pobierz progi alarmowe z konfiguracji
     int lowSoilThreshold = configGetLowSoilPercent();
     int lowBatteryThresholdMv = configGetLowBatteryMilliVolts();
-    int currentBatteryMv = (int)(batteryVoltage * 1000); // Konwertuj na mV
+    int currentBatteryMv = (int)(batteryVoltage * 1000);
 
-    // --- Sprawdź poszczególne warunki alarmowe ---
-    // Resetuj flagi przed sprawdzeniem
     bool currentLowWater = false;
     bool currentLowBattery = false;
     bool currentLowSoil = false;
 
-    // 1. Niski poziom wody
     if (waterLevel <= 0) {
         currentLowWater = true;
-        if (!lowWaterAlarm) { // Loguj tylko przy pierwszej detekcji
+        if (!lowWaterAlarm) {
             Serial.println("[Alarm] Przyczyna: NISKI POZIOM WODY!");
         }
     }
     lowWaterAlarm = currentLowWater;
 
-    // 2. Niska bateria (sprawdzaj tylko, jeśli odczyt > 0, aby uniknąć fałszywego alarmu przy błędzie odczytu)
-    if (batteryVoltage > 0.1) { // Dodaj mały margines na błąd odczytu
-         if (currentBatteryMv < lowBatteryThresholdMv) {
+    if (batteryVoltage > 0.1) {
+        if (currentBatteryMv < lowBatteryThresholdMv) {
             currentLowBattery = true;
-            if (!lowBatteryAlarm) { // Loguj tylko przy pierwszej detekcji
+            if (!lowBatteryAlarm) {
                 Serial.printf("[Alarm] Przyczyna: NISKA BATERIA (%.2fV < %.2fV)!\n", batteryVoltage, lowBatteryThresholdMv / 1000.0);
             }
-         }
+        }
     }
     lowBatteryAlarm = currentLowBattery;
 
-    // 3. Niska wilgotność gleby (sprawdzaj tylko, jeśli odczyt >= 0)
     if (soilMoisture >= 0) {
         if (soilMoisture < lowSoilThreshold) {
             currentLowSoil = true;
-            if (!lowSoilAlarm) { // Loguj tylko przy pierwszej detekcji
-                 Serial.printf("[Alarm] Przyczyna: NISKA WILGOTNOŚĆ GLEBY (%d%% < %d%%)!\n", soilMoisture, lowSoilThreshold);
+            if (!lowSoilAlarm) {
+                Serial.printf("[Alarm] Przyczyna: NISKA WILGOTNOŚĆ GLEBY (%d%% < %d%%)!\n", soilMoisture, lowSoilThreshold);
             }
         }
     }
     lowSoilAlarm = currentLowSoil;
 
-    // --- Ustal ogólny stan alarmu ---
     bool previousAlarmState = isAlarmActive;
     isAlarmActive = lowWaterAlarm || lowBatteryAlarm || lowSoilAlarm;
 
-    // --- Logika sterowania buzzerem ---
     if (isAlarmActive) {
-        // Jeśli alarm właśnie się aktywował
+        unsigned long currentTime = millis();
+        
         if (!previousAlarmState) {
             Serial.println("[Alarm] ALARM AKTYWOWANY!");
-            // Umożliw natychmiastowe piknięcie po pierwszej aktywacji
-            // Ustawiamy tak, aby warunek (currentTime - lastBeepTime >= BEEP_INTERVAL) był od razu prawdziwy
-            lastBeepTime = millis() - BEEP_INTERVAL - 1;
+            lastBeepCycleTime = currentTime - BEEP_INTERVAL - 1; // wymuś natychmiastowy start
         }
 
-        // Obsługa pikania co interwał
-        unsigned long currentTime = millis();
-        if (currentTime - lastBeepTime >= BEEP_INTERVAL) {
-            Serial.println("[Alarm] BEEP!");
-            digitalWrite(buzzerPin, HIGH); // Włącz buzzer
-            delay(BEEP_DURATION);          // Poczekaj BEEP_DURATION (uproszczone)
-            digitalWrite(buzzerPin, LOW);  // Wyłącz buzzer
-            lastBeepTime = currentTime;    // Zapisz czas TEGO pikania
+        // Obsługa rozpoczynania nowego cyklu pikania
+        if (currentTime - lastBeepCycleTime >= BEEP_INTERVAL && beepsRemaining == 0) {
+            if (lowBatteryAlarm) {
+                beepCount = 3;
+            } else if (lowWaterAlarm) {
+                beepCount = 2;
+            } else if (lowSoilAlarm) {
+                beepCount = 1;
+            } else {
+                beepCount = 0;
+            }
+
+            if (beepCount > 0) {
+                beepsRemaining = beepCount;
+                buzzerOn = false;
+                buzzerStateChangeTime = currentTime;
+            }
+            lastBeepCycleTime = currentTime;
+        }
+
+        // Obsługa pojedynczych piknięć w cyklu
+        if (beepsRemaining > 0) {
+            if (!buzzerOn && (currentTime - buzzerStateChangeTime >= BEEP_PAUSE)) {
+                // Włącz buzzer
+                digitalWrite(buzzerPin, HIGH);
+                buzzerOn = true;
+                buzzerStateChangeTime = currentTime;
+            } else if (buzzerOn && (currentTime - buzzerStateChangeTime >= BEEP_DURATION)) {
+                // Wyłącz buzzer
+                digitalWrite(buzzerPin, LOW);
+                buzzerOn = false;
+                beepsRemaining--;
+                buzzerStateChangeTime = currentTime;
+            }
         }
     } else {
-        // Jeśli alarm właśnie się dezaktywował
         if (previousAlarmState) {
-             Serial.println("[Alarm] Stan normalny - alarm dezaktywowany.");
-             digitalWrite(buzzerPin, LOW); // Upewnij się, że buzzer jest cicho
+            Serial.println("[Alarm] Stan normalny - alarm dezaktywowany.");
+            digitalWrite(buzzerPin, LOW);
+            beepsRemaining = 0;
+            buzzerOn = false;
         }
     }
 }
 
 bool alarmManagerIsAlarmActive() {
-    // Po prostu zwróć aktualną wartość flagi ustawianej w alarmManagerUpdate
     return isAlarmActive;
 }
