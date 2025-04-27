@@ -20,6 +20,7 @@ const char* PREF_PUMP_RUN_MS = "pumpMs";
 const char* PREF_SOIL_THRESHOLD = "soilThresh";
 const char* PREF_BAT_ADC_PIN = "batAdcPin";
 const char* PREF_DHT_PIN = "dhtPin";
+const char* PREF_DHT_PWR_PIN = "dhtPwrPin";
 const char* PREF_MPU_INT_PIN = "mpuIntPin"; // Nowy klucz dla pinu INT MPU
 const char* PREF_SLEEP_SEC = "sleepSec";
 const char* PREF_CONT_MODE = "contMode";
@@ -43,7 +44,9 @@ const int DEFAULT_SOIL_THRESHOLD = 30;
 // Battery Monitor
 const uint8_t DEFAULT_BAT_ADC_PIN = 35;
 // DHT Sensor
-const uint8_t DEFAULT_DHT_PIN = 4;
+const uint8_t DEFAULT_DHT_PIN = 14;
+const uint8_t DEFAULT_DHT_PWR_PIN = 27; 
+
 // MPU Sensor
 const uint8_t DEFAULT_MPU_INT_PIN = 33; // Domyślny pin dla przerwania MPU
 // General
@@ -79,6 +82,7 @@ static uint8_t buzzerPin;
 static int lowBatteryMilliVolts; // Deklaracja zmiennej dla progu baterii
 static int lowSoilPercent;  
 static bool alarmSoundEnabled;
+static uint8_t dhtPowerPin;
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 void saveDefaultConfigurationIfNeeded() {
@@ -104,6 +108,7 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putBool(PREF_ALARM_SND_EN, DEFAULT_ALARM_SOUND_ENABLED);
         preferences.putInt(PREF_LOW_BAT_MV, DEFAULT_LOW_BATTERY_MV);
         preferences.putInt(PREF_LOW_SOIL_PCT, DEFAULT_LOW_SOIL_PERCENT);
+        preferences.putUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
 
                // UWAGA: Te progi powinny być konfigurowalne przez Blynk w przyszłości
             //    preferences.putInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
@@ -137,6 +142,7 @@ void configSetup() {
     alarmSoundEnabled = preferences.getBool(PREF_ALARM_SND_EN, DEFAULT_ALARM_SOUND_ENABLED);
     lowBatteryMilliVolts = preferences.getInt(PREF_LOW_BAT_MV, DEFAULT_LOW_BATTERY_MV);
     lowSoilPercent = preferences.getInt(PREF_LOW_SOIL_PCT, DEFAULT_LOW_SOIL_PERCENT);
+    dhtPowerPin = preferences.getUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
 
     preferences.end();
 
@@ -163,7 +169,7 @@ void configSetup() {
     Serial.printf("  Dźwięk alarmu włączony: %s\n", alarmSoundEnabled ? "TAK" : "NIE");
     Serial.printf("  Próg alarmu niskiej baterii: %d mV\n", lowBatteryMilliVolts);
     Serial.printf("  Próg alarmu niskiej wilg. gleby: %d %%\n", lowSoilPercent);
-
+    Serial.printf("  Pin zasilania DHT11: %d\n", dhtPowerPin);
 
     Serial.println("--------------------");
 }
@@ -184,6 +190,7 @@ uint8_t configGetMpuIntPin() { return mpuIntPin; } // Getter dla pinu INT MPU
 uint32_t configGetBlynkSendIntervalSec() { return blynkSendIntervalSec; }
 uint8_t configGetBuzzerPin() { return buzzerPin; }
 bool configIsAlarmSoundEnabled() { return alarmSoundEnabled; }
+uint8_t configGetDhtPowerPin() { return dhtPowerPin; }
 
 uint8_t configGetWaterLevelPin(int level) {
     if (level >= 1 && level <= NUM_WATER_LEVELS_CONFIG) {

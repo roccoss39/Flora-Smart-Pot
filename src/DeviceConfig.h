@@ -26,7 +26,7 @@ uint8_t configGetBatteryAdcPin();
 
 // Getter dla pinu DHT11
 uint8_t configGetDhtPin();
-
+uint8_t configGetDhtPowerPin();
 // Getter dla pinu INT MPU6500
 uint8_t configGetMpuIntPin();
 
@@ -68,6 +68,8 @@ void configSetContinuousMode(bool enabled); // <-- Dodaj tę linię
 uint8_t configGetBuzzerPin();
 int configGetLowBatteryMilliVolts(); // <-- DODAJ: Getter dla progu baterii (mV)
 int configGetLowSoilPercent();  
+
+
 bool configIsAlarmSoundEnabled();
 void configSetAlarmSoundEnabled(bool enabled);
 void configSetLowBatteryMilliVolts(int mv);
