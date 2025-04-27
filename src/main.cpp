@@ -106,44 +106,67 @@ void setup() {
     displayMeasurements(initialData); // Wywołaj funkcję wyświetlającą
 
 
-    // --- Logika połączenia WiFi ---
-    bool connectSuccess = false;
-    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-    WiFi.mode(WIFI_STA);
-    WiFiManager wm;
-    // wm.resetSettings();
-
-    wm.setConnectTimeout(10);
-    if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
-        Serial.println("[WiFi] Wykryto Reset/Power-On. Ustawiam timeout portalu na 120s.");
-        wm.setConfigPortalTimeout(120);
-    } else {
-        Serial.println("[WiFi] Wykryto wybudzenie z Deep Sleep. Ustawiam timeout portalu na 0s.");
-        wm.setConfigPortalTimeout(0);
-    }
-    //wm.setWiFiAutoReconnect(true);
-    String apName = "Flaura-Wifi-" + String((uint32_t)ESP.getEfuseMac(), HEX);
-
-    Serial.println("Próba połączenia z zapisaną siecią WiFi...");
-    if (wm.autoConnect(apName.c_str())) {
-        Serial.println("\nPołączono z WiFi!");
-        Serial.print("Adres IP: ");
-        Serial.println(WiFi.localIP());
-        connectSuccess = true;
-
-        blynkConfigure(BLYNK_AUTH_TOKEN, BLYNK_TEMPLATE_ID, BLYNK_DEVICE_NAME);
-        if (!blynkConnect()) {
-             Serial.println("OSTRZEŻENIE: Nie udało się połączyć z Blynk mimo połączenia WiFi.");
-        } else {
-             Serial.println("Połączono z Blynk.");
-             powerManagerSyncTime();
+     // --- Logika połączenia WiFi - POPRAWIONA WERSJA ---
+     bool connectSuccess = false;
+     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+ 
+     WiFi.mode(WIFI_STA);
+     WiFiManager wm; // Utwórz obiekt WiFiManager
+ 
+     // wm.resetSettings(); // Odkomentuj do testów resetowania ustawień WiFi
+ 
+      // Ustawienia WiFiManager
+     wm.setConnectTimeout(20); // Czas próby połączenia z zapisaną siecią (sekundy)
+ 
+     // Ustaw timeout portalu WARUNKOWO na podstawie przyczyny uruchomienia
+     if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
+         // Przyczyna: Reset lub Power-On
+         Serial.println("[WiFi] Wykryto Reset/Power-On. Ustawiam timeout portalu na 120s.");
+         wm.setConfigPortalTimeout(120); // Portal będzie aktywny przez 120s, jeśli autoConnect nie połączy się z zapisaną siecią
+     } else {
+         // Przyczyna: Wybudzenie z Deep Sleep (Timer, GPIO itp.)
+         Serial.println("[WiFi] Wykryto wybudzenie z Deep Sleep. Ustawiam timeout portalu na 0s.");
+         wm.setConfigPortalTimeout(0); // Portal NIE powinien uruchomić się automatycznie po nieudanym autoConnect
+         wm.setEnableConfigPortal(false);   
         }
-    } else {
-        Serial.println("\nOSTRZEŻENIE: Nie udało się połączyć z WiFi.");
-        Serial.println("Przechodzę w tryb OFFLINE.");
-        connectSuccess = false;
-    }
-
+ 
+     wm.setWiFiAutoReconnect(true); // Włącz automatyczne ponowne łączenie w tle
+ 
+     // Nazwa sieci AP, która pojawi się (tylko po resecie/power-on), gdy urządzenie nie będzie mogło się połączyć
+     String apName = "Flaura-Wifi-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+ 
+     Serial.println("Próba auto-połączenia z zapisaną siecią WiFi...");
+     // autoConnect próbuje połączyć się z zapisaną siecią (przez connectTimeout).
+     // JEŚLI się nie uda ORAZ timeout portalu jest > 0 (czyli po resecie/power-on), uruchomi portal konfiguracyjny.
+     // JEŚLI się nie uda ORAZ timeout portalu jest == 0 (czyli po deep sleep), POWINIEN zwrócić false bez uruchamiania portalu.
+     if (wm.autoConnect(apName.c_str())) {
+         // Sukces - połączono z zapisaną siecią LUB skonfigurowano przez portal
+         Serial.println("\nPołączono z WiFi!");
+         Serial.print("Adres IP: ");
+         Serial.println(WiFi.localIP());
+         connectSuccess = true;
+     } else {
+         // Niepowodzenie - nie połączono z zapisaną siecią, a portal (jeśli był aktywny) zakończył się bez sukcesu (timeout/anulowanie)
+         // LUB (po deep sleep) - nie połączono z zapisaną siecią, portal nie został uruchomiony.
+         Serial.println("\nOSTRZEŻENIE: Nie udało się połączyć z WiFi lub skonfigurować.");
+         Serial.println("Przechodzę w tryb OFFLINE.");
+         connectSuccess = false;
+     }
+ 
+     // Dalsza logika zależna od connectSuccess
+     if (connectSuccess) {
+         Serial.println("Przechodzę do konfiguracji Blynk i synchronizacji czasu...");
+         blynkConfigure(BLYNK_AUTH_TOKEN, BLYNK_TEMPLATE_ID, BLYNK_DEVICE_NAME);
+         if (!blynkConnect()) {
+              Serial.println("OSTRZEŻENIE: Nie udało się połączyć z Blynk mimo połączenia WiFi.");
+         } else {
+              Serial.println("Połączono z Blynk.");
+              powerManagerSyncTime();
+         }
+     } else {
+         Serial.println("Brak połączenia WiFi, pomijam konfigurację Blynk i synchronizację czasu.");
+     }
+     // --- KONIEC POPRAWIONEJ WERSJI LOGIKI WiFi ---
     // --- Operacje po próbie połączenia ---
     // Wyślij pierwsze dane do Blynk TYLKO jeśli jest połączenie
     if (connectSuccess && blynkIsConnected()) {
