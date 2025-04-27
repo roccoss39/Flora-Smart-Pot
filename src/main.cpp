@@ -70,8 +70,48 @@ void setup() {
 
     digitalWrite(LED_BUILTIN, LOW); // Zgaś po inicjalizacji
 
+    Serial.println("\n--- Pierwszy pomiar/cykl po starcie/wybudzeniu ---");
+            // ... (reszta kodu pomiaru - bez zmian) ...
+            digitalWrite(LED_BUILTIN, HIGH);
+
+            int currentMoisture = soilSensorReadPercent();
+            int currentWaterLevel = waterLevelSensorReadLevel();
+            float currentBatteryVoltage = batteryMonitorReadVoltage();
+            float currentTemperatureDHT;
+            float currentHumidityDHT;
+            bool dhtOk = environmentSensorRead(currentTemperatureDHT, currentHumidityDHT);
+
+            alarmManagerUpdate(currentWaterLevel, currentBatteryVoltage, currentMoisture);
+
+             // Sprawdzenie alarmu i ewentualna zmiana trybu na ciągły
+             if (alarmManagerIsAlarmActive()) {
+                  Serial.println("[SETUP] Wykryto aktywny alarm!");
+                   if (!configIsContinuousMode()) {
+                        Serial.println("[SETUP] Przełączam na tryb ciągły z powodu alarmu...");
+                        configSetContinuousMode(true);
+                   } else {
+                        Serial.println("[SETUP] Już w trybie ciągłym z powodu alarmu.");
+                    }
+                }
+
+
+            digitalWrite(LED_BUILTIN, LOW);
+
+            // Wyświetl wyniki lokalnie
+            Serial.printf("  Tryb ciągły: %s (false = Deep Sleep)\n", configIsContinuousMode() ? "TAK" : "NIE"); // Już wyświetlone wyżej
+            if(currentMoisture >= 0) Serial.printf("  Wilgotność gleby: %d %%\n", currentMoisture); else Serial.println("  Wilgotność gleby: Błąd odczytu");
+            Serial.printf("  Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS); // Zakładamy, że NUM_WATER_LEVELS jest zdefiniowane (np. w WaterLevelSensor.h)
+            if(currentBatteryVoltage > 0) Serial.printf("  Napięcie baterii: %.2f V\n", currentBatteryVoltage); else Serial.println("  Napięcie baterii: Błąd odczytu / Odłączona");
+            if (dhtOk && !isnan(currentTemperatureDHT) && !isnan(currentHumidityDHT)) {
+                Serial.printf("  Temperatura (DHT): %.1f C\n", currentTemperatureDHT);
+                Serial.printf("  Wilgotność pow. (DHT): %.1f %%\n", currentHumidityDHT);
+            } else {
+                 Serial.println("  Temperatura/Wilgotność (DHT): Błąd odczytu");
+            }
+            // Usunięto sekcję MPU
+            Serial.println("-----------------------");
+
     // --- Logika połączenia i pierwszego pomiaru ---
-    bool runMeasurement = true;
     bool connectSuccess = false;
 
     WiFi.mode(WIFI_STA); // Ustaw tryb Station (klient WiFi)
@@ -120,49 +160,7 @@ void setup() {
     if (connectSuccess) {
 
         // Synchronizacja czasu NTP - wymaga połączenia WiFi
-        powerManagerSyncTime();
-
-        if (runMeasurement) { // Ten if może być zbędny, jeśli zawsze mierzymy po sukcesie WiFi
-            Serial.println("\n--- Pierwszy pomiar/cykl po starcie/wybudzeniu ---");
-            // ... (reszta kodu pomiaru - bez zmian) ...
-            digitalWrite(LED_BUILTIN, HIGH);
-
-            int currentMoisture = soilSensorReadPercent();
-            int currentWaterLevel = waterLevelSensorReadLevel();
-            float currentBatteryVoltage = batteryMonitorReadVoltage();
-            float currentTemperatureDHT;
-            float currentHumidityDHT;
-            bool dhtOk = environmentSensorRead(currentTemperatureDHT, currentHumidityDHT);
-
-            alarmManagerUpdate(currentWaterLevel, currentBatteryVoltage, currentMoisture);
-
-             // Sprawdzenie alarmu i ewentualna zmiana trybu na ciągły
-             if (alarmManagerIsAlarmActive()) {
-                  Serial.println("[SETUP] Wykryto aktywny alarm!");
-                   if (!configIsContinuousMode()) {
-                        Serial.println("[SETUP] Przełączam na tryb ciągły z powodu alarmu...");
-                        configSetContinuousMode(true);
-                   } else {
-                        Serial.println("[SETUP] Już w trybie ciągłym z powodu alarmu.");
-                    }
-                }
-
-
-            digitalWrite(LED_BUILTIN, LOW);
-
-            // Wyświetl wyniki lokalnie
-            Serial.printf("  Tryb ciągły: %s (false = Deep Sleep)\n", configIsContinuousMode() ? "TAK" : "NIE"); // Już wyświetlone wyżej
-            if(currentMoisture >= 0) Serial.printf("  Wilgotność gleby: %d %%\n", currentMoisture); else Serial.println("  Wilgotność gleby: Błąd odczytu");
-            Serial.printf("  Poziom wody: %d / %d\n", currentWaterLevel, NUM_WATER_LEVELS); // Zakładamy, że NUM_WATER_LEVELS jest zdefiniowane (np. w WaterLevelSensor.h)
-            if(currentBatteryVoltage > 0) Serial.printf("  Napięcie baterii: %.2f V\n", currentBatteryVoltage); else Serial.println("  Napięcie baterii: Błąd odczytu / Odłączona");
-            if (dhtOk && !isnan(currentTemperatureDHT) && !isnan(currentHumidityDHT)) {
-                Serial.printf("  Temperatura (DHT): %.1f C\n", currentTemperatureDHT);
-                Serial.printf("  Wilgotność pow. (DHT): %.1f %%\n", currentHumidityDHT);
-            } else {
-                 Serial.println("  Temperatura/Wilgotność (DHT): Błąd odczytu");
-            }
-            // Usunięto sekcję MPU
-            Serial.println("-----------------------");
+        powerManagerSyncTime();        
 
             // Wyślij dane do Blynk (już połączony)
             if (connectSuccess && blynkIsConnected()) { 
@@ -173,22 +171,15 @@ void setup() {
             } else {
                 Serial.println("Pomijam wysyłkę pierwszych danych - brak połączenia WiFi/Blynk.");
             }
-
-
             // Kontrola pompy
             pumpControlActivateIfNeeded(currentMoisture, currentWaterLevel);
 
-        } // koniec if(runMeasurement)
-
     } else {
-        // Ta część kodu (else dla if connectSuccess) prawdopodobnie nie zostanie osiągnięta
-        // z powodu ESP.restart() w bloku obsługi błędu autoConnect.
         Serial.println("Nie udało się połączyć z WiFi. Pomijam resztę setup().");
     }
 
-
     // --- Przejście w Deep Sleep (tylko w tym trybie i po udanym setup) ---
-    if (connectSuccess && !configIsContinuousMode()) { // Dodano warunek connectSuccess
+    if (!configIsContinuousMode()) { 
         if (pumpControlIsRunning()) {
             Serial.println("Pompa pracuje - pozostaję w trybie aktywnym do zakończenia pracy pompy.");
         } else {
@@ -199,7 +190,7 @@ void setup() {
             // wifiDisconnect(); // Usuń, jeśli nie ma już tej funkcji
             powerManagerGoToDeepSleep();
         }
-    } else if (connectSuccess) { // Jeśli połączono, ale jest tryb ciągły
+    } else { // Jeśli połączono, ale jest tryb ciągły
         Serial.println("Tryb ciągły aktywny. Dalsza praca w loop().");
     }
 
