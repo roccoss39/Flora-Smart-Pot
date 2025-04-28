@@ -70,6 +70,8 @@ int configGetLowBatteryMilliVolts(); // <-- DODAJ: Getter dla progu baterii (mV)
 int configGetLowSoilPercent();  
 
 
+uint8_t configGetButtonPin();
+
 bool configIsAlarmSoundEnabled();
 void configSetAlarmSoundEnabled(bool enabled);
 void configSetLowBatteryMilliVolts(int mv);

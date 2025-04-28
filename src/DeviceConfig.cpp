@@ -28,6 +28,7 @@ const char* PREF_BUZZER_PIN = "buzzerPin";
 const char* PREF_ALARM_SND_EN = "almSndEn";
 const char* PREF_LOW_BAT_MV = "lowBatMv";
 const char* PREF_LOW_SOIL_PCT = "lowSoilPct";
+const char* PREF_BUTTON_PIN = "buttonPin";
 
 // --- Domyślne wartości konfiguracji ---
 // Soil Sensor - Twoje wartości, z kontrolą VCC
@@ -42,13 +43,12 @@ const uint8_t DEFAULT_PUMP_PIN = 25;
 const uint32_t DEFAULT_PUMP_RUN_MS = 3000;
 const int DEFAULT_SOIL_THRESHOLD = 30;
 // Battery Monitor
-const uint8_t DEFAULT_BAT_ADC_PIN = 35;
+const uint8_t DEFAULT_BAT_ADC_PIN = 33;
 // DHT Sensor
 const uint8_t DEFAULT_DHT_PIN = 14;
 const uint8_t DEFAULT_DHT_PWR_PIN = 27; 
-
 // MPU Sensor
-const uint8_t DEFAULT_MPU_INT_PIN = 33; // Domyślny pin dla przerwania MPU
+const uint8_t DEFAULT_MPU_INT_PIN = 35; // Domyślny pin dla przerwania MPU (wziety z bat - hcyba nei dziala dobrze)
 // General
 const uint32_t DEFAULT_SLEEP_SECONDS = 3600; // 1 godzina
 const bool DEFAULT_CONTINUOUS_MODE = true; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
@@ -63,6 +63,7 @@ const bool DEFAULT_ALARM_SOUND_ENABLED = true;
 const int DEFAULT_LOW_BATTERY_MV = 2900; // Np. 3.3V
 const int DEFAULT_LOW_SOIL_PERCENT = 20; // Np. 20%
 
+const uint8_t DEFAULT_BUTTON_PIN = 32;
 
 // Zmienne statyczne
 static uint8_t soilSensorPin;
@@ -83,6 +84,7 @@ static int lowBatteryMilliVolts; // Deklaracja zmiennej dla progu baterii
 static int lowSoilPercent;  
 static bool alarmSoundEnabled;
 static uint8_t dhtPowerPin;
+static uint8_t buttonPin;
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 void saveDefaultConfigurationIfNeeded() {
@@ -109,6 +111,7 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putInt(PREF_LOW_BAT_MV, DEFAULT_LOW_BATTERY_MV);
         preferences.putInt(PREF_LOW_SOIL_PCT, DEFAULT_LOW_SOIL_PERCENT);
         preferences.putUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
+        preferences.putUChar(PREF_BUTTON_PIN, DEFAULT_BUTTON_PIN);
 
                // UWAGA: Te progi powinny być konfigurowalne przez Blynk w przyszłości
             //    preferences.putInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
@@ -143,6 +146,7 @@ void configSetup() {
     lowBatteryMilliVolts = preferences.getInt(PREF_LOW_BAT_MV, DEFAULT_LOW_BATTERY_MV);
     lowSoilPercent = preferences.getInt(PREF_LOW_SOIL_PCT, DEFAULT_LOW_SOIL_PERCENT);
     dhtPowerPin = preferences.getUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
+    buttonPin = preferences.getUChar(PREF_BUTTON_PIN, DEFAULT_BUTTON_PIN);
 
     preferences.end();
 
@@ -170,6 +174,7 @@ void configSetup() {
     Serial.printf("  Próg alarmu niskiej baterii: %d mV\n", lowBatteryMilliVolts);
     Serial.printf("  Próg alarmu niskiej wilg. gleby: %d %%\n", lowSoilPercent);
     Serial.printf("  Pin zasilania DHT11: %d\n", dhtPowerPin);
+    Serial.printf("  Pin przycisku (wybudzania EXT0): %d\n", buttonPin);
 
     Serial.println("--------------------");
 }
@@ -191,6 +196,7 @@ uint32_t configGetBlynkSendIntervalSec() { return blynkSendIntervalSec; }
 uint8_t configGetBuzzerPin() { return buzzerPin; }
 bool configIsAlarmSoundEnabled() { return alarmSoundEnabled; }
 uint8_t configGetDhtPowerPin() { return dhtPowerPin; }
+uint8_t configGetButtonPin() { return buttonPin; }
 
 uint8_t configGetWaterLevelPin(int level) {
     if (level >= 1 && level <= NUM_WATER_LEVELS_CONFIG) {
@@ -285,6 +291,8 @@ int configGetLowSoilPercent() {
     // Upewnij się, że zmienna 'lowSoilPercent' jest zadeklarowana statycznie wyżej w tym pliku
     return lowSoilPercent;
 }
+
+
 
 void configSetAlarmSoundEnabled(bool enabled) {
     if (alarmSoundEnabled != enabled) {

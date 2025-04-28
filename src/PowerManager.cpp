@@ -8,7 +8,7 @@
 #include "driver/rtc_io.h" // <-- Dodaj ten include dla funkcji rtc_gpio_...
 #include "soc/rtc.h"       // <-- Dodaj ten include dla esp_sleep_pd_config
 
-#define BUTTON_PIN 32       // Pin RTC GPIO (SENSOR VP)
+//#define BUTTON_PIN 32       // Pin RTC GPIO (SENSOR VP)
 #define WAKEUP_LEVEL 0      // Wybudzanie stanem LOW
 
 // Konfiguracja NTP
@@ -109,25 +109,39 @@ void powerManagerGoToDeepSleep() {
 }
 
 void powerManagerConfigureButtonWakeup() {
-    // Używamy definicji z góry pliku:
-    // #define BUTTON_PIN 32
-    // #define WAKEUP_LEVEL 0
+    // <<< ZMIANA: Pobierz pin przycisku z konfiguracji >>>
+    uint8_t buttonPin = configGetButtonPin();
 
-    Serial.printf("Konfiguruję wybudzanie EXT0 na GPIO %d, poziom: %d (z wewn. pull-up)\n", BUTTON_PIN, WAKEUP_LEVEL);
+    // Sprawdź, czy pin jest prawidłowo skonfigurowany
+    if (buttonPin == 255) {
+        Serial.println("[PowerManager] OSTRZEŻENIE: Pin przycisku (wybudzania) nie jest skonfigurowany w DeviceConfig! Pomijam konfigurację EXT0.");
+        return;
+    }
+     // Sprawdź, czy pin jest pinem RTC GPIO (wymagane dla EXT0)
+     if (!rtc_gpio_is_valid_gpio((gpio_num_t)buttonPin)) {
+         Serial.printf("[PowerManager] OSTRZEŻENIE: Pin %d nie jest pinem RTC GPIO! Nie można użyć do wybudzania EXT0.\n", buttonPin);
+         return;
+     }
 
-    // 1. Włącz wewnętrzny pull-up
-    esp_err_t pullup_result = rtc_gpio_pullup_en((gpio_num_t)BUTTON_PIN);
+
+    Serial.printf("Konfiguruję wybudzanie EXT0 na GPIO %d, poziom: %d (z wewn. pull-up)\n", buttonPin, WAKEUP_LEVEL);
+
+    // 1. Włącz wewnętrzny pull-up dla skonfigurowanego pinu
+    // <<< ZMIANA: Użycie zmiennej buttonPin >>>
+    esp_err_t pullup_result = rtc_gpio_pullup_en((gpio_num_t)buttonPin);
     if (pullup_result != ESP_OK) {
-        Serial.printf("Błąd włączenia wewn. pull-up dla GPIO %d: %s\n", BUTTON_PIN, esp_err_to_name(pullup_result));
+        Serial.printf("Błąd włączenia wewn. pull-up dla GPIO %d: %s\n", buttonPin, esp_err_to_name(pullup_result));
     }
-    rtc_gpio_pulldown_dis((gpio_num_t)BUTTON_PIN);
+    // <<< ZMIANA: Użycie zmiennej buttonPin >>>
+    rtc_gpio_pulldown_dis((gpio_num_t)buttonPin);
 
-    // 2. Włącz wybudzanie EXT0
-    esp_err_t ext0_result = esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_PIN, WAKEUP_LEVEL);
+    // 2. Włącz wybudzanie EXT0 dla skonfigurowanego pinu
+    // <<< ZMIANA: Użycie zmiennej buttonPin >>>
+    esp_err_t ext0_result = esp_sleep_enable_ext0_wakeup((gpio_num_t)buttonPin, WAKEUP_LEVEL);
     if (ext0_result != ESP_OK) {
-         Serial.printf("Błąd konfiguracji EXT0: %s\n", esp_err_to_name(ext0_result));
+         Serial.printf("Błąd konfiguracji EXT0 dla GPIO %d: %s\n", buttonPin, esp_err_to_name(ext0_result));
     }
 
-    // 3. Utrzymaj zasilanie RTC Peripherals
+    // 3. Utrzymaj zasilanie RTC Peripherals (bez zmian)
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
 }
