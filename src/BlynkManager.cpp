@@ -17,6 +17,7 @@
 #define BLYNK_VPIN_PUMP_STATUS  V7
 // <<< NOWOŚĆ: VPIN dla wskaźnika ogólnego stanu alarmu >>>
 #define BLYNK_VPIN_ALARM_STATUS V8  // WYBIERZ WOLNY PIN! (np. LED widget)
+#define BLYNK_VPIN_WATER_LEVEL_THRESHOLD V9 
 
 // --- VPINy do sterowania ---
 #define BLYNK_VPIN_PUMP_MANUAL  V10 // Przycisk
@@ -174,6 +175,7 @@ BLYNK_CONNECTED() {
     Blynk.syncVirtual(BLYNK_VPIN_ALARM_SOUND_ENABLE);
     Blynk.syncVirtual(BLYNK_VPIN_ALARM_BAT_THRESHOLD);
     Blynk.syncVirtual(BLYNK_VPIN_ALARM_SOIL_THRESHOLD);
+    Blynk.syncVirtual(BLYNK_VPIN_WATER_LEVEL_THRESHOLD);
 
     if (!alarmManagerIsAlarmActive())
     {
@@ -196,9 +198,10 @@ BLYNK_CONNECTED() {
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_BAT_THRESHOLD, configGetLowBatteryMilliVolts());
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_SOIL_THRESHOLD, configGetLowSoilPercent());
 
-    // <<< NOWOŚĆ: Aktualizuj wskaźnik alarmu przy połączeniu >>>
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_STATUS, alarmManagerIsAlarmActive() ? 1 : 0); //
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, pumpControlIsRunning() ? 1 : 0);
+
+    Blynk.virtualWrite(BLYNK_VPIN_WATER_LEVEL_THRESHOLD, configGetWaterLevelThreshold());
     Serial.println("[Blynk] Synchronizacja zakończona.");
 }
 
@@ -221,4 +224,10 @@ BLYNK_WRITE(BLYNK_VPIN_ALARM_SOIL_THRESHOLD) {
   int newThresholdPercent = param.asInt();
   Serial.printf("[Blynk] Otrzymano nowy próg alarmu wilg. gleby na V%d: %d %%\n", BLYNK_VPIN_ALARM_SOIL_THRESHOLD, newThresholdPercent);
   configSetLowSoilPercent(newThresholdPercent);
+}
+BLYNK_WRITE(BLYNK_VPIN_WATER_LEVEL_THRESHOLD) {
+  // Wartość progu ADC jest zazwyczaj uint16_t (0-4095)
+  uint16_t newThreshold = param.asInt(); // Odczytaj wartość z widgetu
+  Serial.printf("[Blynk] Otrzymano nowy próg ADC poziomu wody na V%d: %u\n", BLYNK_VPIN_WATER_LEVEL_THRESHOLD, newThreshold);
+  configSetWaterLevelThreshold(newThreshold); // Użyj settera z DeviceConfig
 }

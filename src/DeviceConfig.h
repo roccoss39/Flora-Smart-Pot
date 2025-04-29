@@ -16,6 +16,14 @@ int configGetSoilVccPin();
 // Gettery dla czujnika poziomu wody
 uint8_t configGetWaterLevelPin(int level); // Dla poziomów 1-5
 
+// Nowe gettery dla sondy poziomu wody
+uint8_t  configGetWaterLevelGroundPin();   // wspólna sonda (wejście analogowe)
+uint16_t configGetWaterLevelThreshold();    // próg ADC do detekcji wody
+
+// Settery dla sondy poziomu wody
+void configSetWaterLevelGroundPin(uint8_t pin);
+void configSetWaterLevelThreshold(uint16_t threshold);
+
 // Gettery dla pompki
 uint8_t configGetPumpPin();
 uint32_t configGetPumpRunMillis();
@@ -63,12 +71,11 @@ bool configSetMeasurementTime(int hour, int minute);
  * @brief Ustawia i zapisuje tryb pracy urządzenia.
  * @param enabled true dla trybu ciągłego, false dla trybu Deep Sleep.
  */
-void configSetContinuousMode(bool enabled); // <-- Dodaj tę linię
+void configSetContinuousMode(bool enabled);
 
 uint8_t configGetBuzzerPin();
-int configGetLowBatteryMilliVolts(); // <-- DODAJ: Getter dla progu baterii (mV)
+int configGetLowBatteryMilliVolts(); // Getter dla progu baterii (mV)
 int configGetLowSoilPercent();  
-
 
 uint8_t configGetButtonPin();
 
@@ -76,4 +83,5 @@ bool configIsAlarmSoundEnabled();
 void configSetAlarmSoundEnabled(bool enabled);
 void configSetLowBatteryMilliVolts(int mv);
 void configSetLowSoilPercent(int percent); // Próg dla alarmu wilgotności
+
 #endif // DEVICECONFIG_H

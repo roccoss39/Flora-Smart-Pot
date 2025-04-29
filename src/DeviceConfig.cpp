@@ -14,7 +14,11 @@ const char* PREF_SOIL_PIN = "soilPin";
 const char* PREF_SOIL_DRY = "soilDry";
 const char* PREF_SOIL_WET = "soilWet";
 const char* PREF_SOIL_VCC = "soilVccPin";
+
 const char* PREF_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { "wlPin1", "wlPin2", "wlPin3", "wlPin4", "wlPin5" };
+const char* PREF_WL_GROUND_PIN = "wlGndPin";
+const char* PREF_WL_THRESHOLD = "wlThresh";
+
 const char* PREF_PUMP_PIN = "pumpPin";
 const char* PREF_PUMP_RUN_MS = "pumpMs";
 const char* PREF_SOIL_THRESHOLD = "soilThresh";
@@ -38,6 +42,8 @@ const int DEFAULT_SOIL_WET = 930;
 const int DEFAULT_SOIL_VCC_PIN = 26;
 // Water Level Sensor - Twoja kolejność pinów
 const uint8_t DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { 19, 18, 5, 17, 16 };
+const uint8_t  DEFAULT_WL_GROUND_PIN = 39;
+const uint16_t DEFAULT_WL_THRESHOLD = 2000;  // przykładowo ~50% skali ADC
 // Pump
 const uint8_t DEFAULT_PUMP_PIN = 25;
 const uint32_t DEFAULT_PUMP_RUN_MS = 3000;
@@ -65,6 +71,9 @@ const int DEFAULT_LOW_SOIL_PERCENT = 20; // Np. 20%
 
 const uint8_t DEFAULT_BUTTON_PIN = 32;
 
+static uint8_t  waterLevelGroundPin;
+static uint16_t waterLevelThreshold;
+
 // Zmienne statyczne
 static uint8_t soilSensorPin;
 static int soilAdcDry;
@@ -86,6 +95,7 @@ static bool alarmSoundEnabled;
 static uint8_t dhtPowerPin;
 static uint8_t buttonPin;
 
+
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 void saveDefaultConfigurationIfNeeded() {
      if (!preferences.isKey(PREF_SLEEP_SEC)) {
@@ -94,9 +104,6 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putInt(PREF_SOIL_DRY, DEFAULT_SOIL_DRY);
         preferences.putInt(PREF_SOIL_WET, DEFAULT_SOIL_WET);
         preferences.putInt(PREF_SOIL_VCC, DEFAULT_SOIL_VCC_PIN);
-        for (int i = 0; i < NUM_WATER_LEVELS_CONFIG; i++) {
-            preferences.putUChar(PREF_WL_PIN[i], DEFAULT_WL_PIN[i]);
-        }
         preferences.putUChar(PREF_PUMP_PIN, DEFAULT_PUMP_PIN);
         preferences.putUInt(PREF_PUMP_RUN_MS, DEFAULT_PUMP_RUN_MS);
         preferences.putInt(PREF_SOIL_THRESHOLD, DEFAULT_SOIL_THRESHOLD);
@@ -113,10 +120,14 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
         preferences.putUChar(PREF_BUTTON_PIN, DEFAULT_BUTTON_PIN);
 
-               // UWAGA: Te progi powinny być konfigurowalne przez Blynk w przyszłości
-            //    preferences.putInt("lowBatMv", DEFAULT_LOW_BATTERY_MV);
-            //    preferences.putInt("lowSoilPct", DEFAULT_LOW_SOIL_PERCENT);
-
+        if (!preferences.isKey(PREF_WL_GROUND_PIN)) {
+            // tylko raz zapisujemy domyślne ustawienia
+            for (int i = 0; i < NUM_WATER_LEVELS_CONFIG; i++) {
+                preferences.putUChar(PREF_WL_PIN[i], DEFAULT_WL_PIN[i]);
+            }
+            preferences.putUChar(PREF_WL_GROUND_PIN, DEFAULT_WL_GROUND_PIN);
+            preferences.putUShort(PREF_WL_THRESHOLD, DEFAULT_WL_THRESHOLD);
+        }
      }
 }
 
@@ -132,6 +143,10 @@ void configSetup() {
     for (int i = 0; i < NUM_WATER_LEVELS_CONFIG; i++) {
         waterLevelPins[i] = preferences.getUChar(PREF_WL_PIN[i], DEFAULT_WL_PIN[i]);
     }
+    // Wczytaj wspólną sondę ADC
+    waterLevelGroundPin = preferences.getUChar(PREF_WL_GROUND_PIN, DEFAULT_WL_GROUND_PIN);
+    // Wczytaj próg ADC
+    waterLevelThreshold = preferences.getUShort(PREF_WL_THRESHOLD, DEFAULT_WL_THRESHOLD);
     pumpPin = preferences.getUChar(PREF_PUMP_PIN, DEFAULT_PUMP_PIN);
     pumpRunMillis = preferences.getUInt(PREF_PUMP_RUN_MS, DEFAULT_PUMP_RUN_MS);
     soilMoistureThreshold = preferences.getInt(PREF_SOIL_THRESHOLD, DEFAULT_SOIL_THRESHOLD);
@@ -197,16 +212,32 @@ uint8_t configGetBuzzerPin() { return buzzerPin; }
 bool configIsAlarmSoundEnabled() { return alarmSoundEnabled; }
 uint8_t configGetDhtPowerPin() { return dhtPowerPin; }
 uint8_t configGetButtonPin() { return buttonPin; }
+uint8_t  configGetWaterLevelPin(int level)         { return (level>=1 && level<=NUM_WATER_LEVELS_CONFIG) ? waterLevelPins[level-1] : 255; }
+uint8_t  configGetWaterLevelGroundPin()            { return waterLevelGroundPin; }
+uint16_t configGetWaterLevelThreshold()            { return waterLevelThreshold; }
 
-uint8_t configGetWaterLevelPin(int level) {
-    if (level >= 1 && level <= NUM_WATER_LEVELS_CONFIG) {
-        return waterLevelPins[level - 1];
-    }
-    return 255;
-}
 
 // --- IMPLEMENTACJA NOWYCH SETTERÓW ---
-
+void configSetWaterLevelGroundPin(uint8_t pin) {
+    if (waterLevelGroundPin != pin) {
+        waterLevelGroundPin = pin;
+        preferences.begin(PREF_NAMESPACE, false);
+        preferences.putUChar(PREF_WL_GROUND_PIN, pin);
+        preferences.end();
+        Serial.printf("[Config] Zapisano nowy pin sondy odniesienia: %d\n", pin);
+    }
+}
+void configSetWaterLevelThreshold(uint16_t threshold) {
+    // walidacja 0–4095
+    if (threshold > 4095) threshold = 4095;
+    if (waterLevelThreshold != threshold) {
+        waterLevelThreshold = threshold;
+        preferences.begin(PREF_NAMESPACE, false);
+        preferences.putUShort(PREF_WL_THRESHOLD, threshold);
+        preferences.end();
+        Serial.printf("[Config] Zapisano nowy próg detekcji wody: %u\n", threshold);
+    }
+}
 /**
  * @brief Ustawia i zapisuje nowy czas pracy pompy.
  */
