@@ -11,7 +11,7 @@ const float R4_VALUE = 33020.0;  // Rezystor do V_BAT
 const float VOLTAGE_MULTIPLIER = (R1_VALUE + R4_VALUE) / R1_VALUE; // ≈ 1.33
 
 // Napięcie referencyjne ADC i rozdzielczość (może wymagać kalibracji dla dokładności)
-const float ADC_VREF = 3.3;       // Typowe napięcie referencyjne dla ESP32
+const float ADC_VREF = 3.2;       // Typowe napięcie referencyjne dla ESP32
 const float ADC_MAX_VALUE = 4095.0; // Dla domyślnej rozdzielczości 12-bit
 
 void batteryMonitorSetup() {
