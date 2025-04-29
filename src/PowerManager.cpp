@@ -8,7 +8,6 @@
 #include "driver/rtc_io.h" // <-- Dodaj ten include dla funkcji rtc_gpio_...
 #include "soc/rtc.h"       // <-- Dodaj ten include dla esp_sleep_pd_config
 
-//#define BUTTON_PIN 32       // Pin RTC GPIO (SENSOR VP)
 #define WAKEUP_LEVEL 0      // Wybudzanie stanem LOW
 
 // Konfiguracja NTP

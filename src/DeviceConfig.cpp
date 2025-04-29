@@ -54,7 +54,7 @@ const uint32_t DEFAULT_SLEEP_SECONDS = 3600; // 1 godzina
 const bool DEFAULT_CONTINUOUS_MODE = true; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
 //Blynk
 const char* PREF_BLYNK_INTERVAL = "blynkInt";
-const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 30; // Domyślnie co 60 sekund
+const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 12000; // Domyślnie co 60 sekund
 static uint32_t blynkSendIntervalSec;
 
 const uint8_t DEFAULT_BUZZER_PIN = 23; // Domyślny pin dla buzzera

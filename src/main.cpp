@@ -113,7 +113,7 @@ void setup() {
      WiFi.mode(WIFI_STA);
      WiFiManager wm; // Utwórz obiekt WiFiManager
  
-     // wm.resetSettings(); // Odkomentuj do testów resetowania ustawień WiFi
+     //wm.resetSettings(); // Odkomentuj do testów resetowania ustawień WiFi
  
       // Ustawienia WiFiManager
      wm.setConnectTimeout(20); // Czas próby połączenia z zapisaną siecią (sekundy)
