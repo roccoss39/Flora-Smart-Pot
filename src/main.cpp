@@ -18,6 +18,8 @@
 #include "PowerManager.h"
 #include "AlarmManager.h"
 #include <Preferences.h>
+#include "ButtonManager.h"
+
 
 // --- NOWOŚĆ: Struktura do przechowywania danych z pomiarów ---
 struct SensorData {
@@ -81,6 +83,7 @@ void setup() {
     batteryMonitorSetup();
     environmentSensorSetup();
     alarmManagerSetup();
+    buttonSetup();
 
     digitalWrite(LED_BUILTIN, LOW);
 
@@ -230,6 +233,38 @@ void loop() {
     // --- GŁÓWNA LOGIKA CYKLICZNA (Pomiar, Sterowanie) ---
     if (configIsContinuousMode()) {
         // --- Tryb Ciągły ---
+        if (buttonWasPressed()) { // Wywołaj funkcję z ButtonManager
+            // Jeśli zwróciła true (przycisk naciśnięty) - wykonaj akcje:
+            Serial.println("\n[Main] Wykryto sygnał naciśnięcia przycisku - Wywołuję ręczny pomiar!");
+
+            // Krok 1: Odczytaj sensory
+            SensorData manualData = performMeasurement();
+            // Zaktualizuj ostatnie znane wartości
+            if (manualData.soilMoisture >= 0) lastMoisture = manualData.soilMoisture;
+            lastWaterLevel = manualData.waterLevel;
+            if (manualData.batteryVoltage > 0) lastBatteryVoltage = manualData.batteryVoltage;
+
+            // Krok 2: Wyświetl wyniki lokalnie
+            displayMeasurements(manualData);
+
+            // Krok 3: Wyślij dane do Blynk (TYLKO jeśli jest połączenie)
+            if (WiFi.status() == WL_CONNECTED && blynkIsConnected()) {
+                 Serial.println("Wysyłanie danych do Blynk (po naciśnięciu przycisku)...");
+                 blynkSendSensorData(manualData.soilMoisture, manualData.waterLevel, manualData.batteryVoltage,
+                                      manualData.temperature, manualData.humidity,
+                                      NAN, false, pumpControlIsRunning());
+            } else {
+                 Serial.println("Pomijam wysyłkę do Blynk - brak połączenia.");
+            }
+
+            // Krok 4: Aktywuj pompę jeśli potrzeba
+            pumpControlActivateIfNeeded(manualData.soilMoisture, manualData.waterLevel);
+
+            // Krok 5: Zresetuj timer cyklicznych pomiarów
+            lastMeasurementTime = millis();
+            Serial.println("[Main] Ręczny pomiar zakończony. Timer okresowy zresetowany.");
+       }
+       
         uint32_t interval = configGetBlynkSendIntervalSec() * 1000;
         if (interval == 0) interval = 60000;
 
