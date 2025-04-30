@@ -37,8 +37,8 @@ const char* PREF_BUTTON_PIN = "buttonPin";
 // --- Domyślne wartości konfiguracji ---
 // Soil Sensor - Twoje wartości, z kontrolą VCC
 const uint8_t DEFAULT_SOIL_PIN = 34;
-const int DEFAULT_SOIL_DRY = 2755;
-const int DEFAULT_SOIL_WET = 970;
+const int DEFAULT_SOIL_DRY = 2735;
+const int DEFAULT_SOIL_WET = 950;
 const int DEFAULT_SOIL_VCC_PIN = 26;
 // Water Level Sensor - Twoja kolejność pinów
 const uint8_t DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { 19, 18, 5, 17, 16 };
