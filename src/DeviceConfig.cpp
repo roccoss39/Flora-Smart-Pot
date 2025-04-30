@@ -56,7 +56,7 @@ const uint8_t DEFAULT_DHT_PWR_PIN = 27;
 // MPU Sensor
 const uint8_t DEFAULT_MPU_INT_PIN = 35; // Domyślny pin dla przerwania MPU (wziety z bat - hcyba nei dziala dobrze)
 // General
-const uint32_t DEFAULT_SLEEP_SECONDS = 3600; // 1 godzina
+const uint32_t DEFAULT_SLEEP_SECONDS = 86400; // 24 h
 const bool DEFAULT_CONTINUOUS_MODE = true; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
 //Blynk
 const char* PREF_BLYNK_INTERVAL = "blynkInt";
@@ -66,8 +66,8 @@ static uint32_t blynkSendIntervalSec;
 const uint8_t DEFAULT_BUZZER_PIN = 23; // Domyślny pin dla buzzera
 
 const bool DEFAULT_ALARM_SOUND_ENABLED = true;
-const int DEFAULT_LOW_BATTERY_MV = 2900; // Np. 3.3V
-const int DEFAULT_LOW_SOIL_PERCENT = 20; // Np. 20%
+const int DEFAULT_LOW_BATTERY_MV = 3300; // Np. 3.3V
+const int DEFAULT_LOW_SOIL_PERCENT = 40; // Np. 20%
 
 const uint8_t DEFAULT_BUTTON_PIN = 32;
 

@@ -125,7 +125,7 @@ void setup() {
      if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
          // Przyczyna: Reset lub Power-On
          Serial.println("[WiFi] Wykryto Reset/Power-On. Ustawiam timeout portalu na 120s.");
-         wm.setConfigPortalTimeout(120); // Portal będzie aktywny przez 120s, jeśli autoConnect nie połączy się z zapisaną siecią
+         wm.setConfigPortalTimeout(20); // Portal będzie aktywny przez 120s, jeśli autoConnect nie połączy się z zapisaną siecią
      } else {
          // Przyczyna: Wybudzenie z Deep Sleep (Timer, GPIO itp.)
          Serial.println("[WiFi] Wykryto wybudzenie z Deep Sleep. Ustawiam timeout portalu na 0s.");
@@ -206,13 +206,11 @@ void setup() {
     }
 
 } // Koniec setup()
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // --- Główna pętla Loop ---
 void loop() {
     // Zmienne statyczne do przechowywania ostatnich odczytów dla alarmu
-    static int lastMoisture = -1;
-    static int lastWaterLevel = -1;
-    static float lastBatteryVoltage = -1.0f;
 
     // --- ZAWSZE WYKONYWANE ---
     pumpControlUpdate();
@@ -228,11 +226,18 @@ void loop() {
           }
        }
        blynkRun();
+    } else if (!alarmManagerIsAlarmActive() && (!pumpControlIsRunning()))   {
+        Serial.println("Brak aktywnego alarmu oraz połączenia z siecią - włączam tryb uśpienia");
+        configSetContinuousMode(false);
     }
 
     // --- GŁÓWNA LOGIKA CYKLICZNA (Pomiar, Sterowanie) ---
     if (configIsContinuousMode()) {
         // --- Tryb Ciągły ---
+        static int lastMoisture = -1;
+        static int lastWaterLevel = -1;
+        static float lastBatteryVoltage = -1.0f;
+
         if (buttonWasPressed()) { // Wywołaj funkcję z ButtonManager
             // Jeśli zwróciła true (przycisk naciśnięty) - wykonaj akcje:
             Serial.println("\n[Main] Wykryto sygnał naciśnięcia przycisku - Wywołuję ręczny pomiar!");
@@ -247,6 +252,7 @@ void loop() {
             // Krok 2: Wyświetl wyniki lokalnie
             displayMeasurements(manualData);
 
+            
             // Krok 3: Wyślij dane do Blynk (TYLKO jeśli jest połączenie)
             if (WiFi.status() == WL_CONNECTED && blynkIsConnected()) {
                  Serial.println("Wysyłanie danych do Blynk (po naciśnięciu przycisku)...");
@@ -257,15 +263,19 @@ void loop() {
                  Serial.println("Pomijam wysyłkę do Blynk - brak połączenia.");
             }
 
+            alarmManagerUpdate(lastWaterLevel, lastBatteryVoltage, lastMoisture);
+
             // Krok 4: Aktywuj pompę jeśli potrzeba
             pumpControlActivateIfNeeded(manualData.soilMoisture, manualData.waterLevel);
 
             // Krok 5: Zresetuj timer cyklicznych pomiarów
             lastMeasurementTime = millis();
             Serial.println("[Main] Ręczny pomiar zakończony. Timer okresowy zresetowany.");
+
+            
        }
        
-        uint32_t interval = configGetBlynkSendIntervalSec() * 1000;
+        uint32_t interval = 30 * 1000;
         if (interval == 0) interval = 60000;
 
         // Sprawdź, czy nadszedł czas na kolejny cykl pomiarowy
@@ -293,13 +303,14 @@ void loop() {
                  Serial.println("Pomijam wysyłkę do Blynk - brak połączenia.");
             }
 
+            alarmManagerUpdate(lastWaterLevel, lastBatteryVoltage, lastMoisture);
             // --- Krok 4: Aktywuj pompę jeśli potrzeba (niezależnie od WiFi) ---
             // Użyj danych z currentData
             pumpControlActivateIfNeeded(currentData.soilMoisture, currentData.waterLevel);
 
             // --- Krok 5: Zaktualizuj czas ostatniego pomiaru ---
             lastMeasurementTime = millis();
-
+            
         } // koniec if (czas na pomiar)
 
     } else {
@@ -316,7 +327,7 @@ void loop() {
 
     // --- ZAWSZE WYKONYWANE na końcu pętli ---
     // Aktualizacja stanu alarmu na podstawie ostatnich poprawnych odczytów
-    alarmManagerUpdate(lastWaterLevel, lastBatteryVoltage, lastMoisture);
+
 
     delay(10);
 
