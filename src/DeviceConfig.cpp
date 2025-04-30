@@ -47,9 +47,10 @@ const uint16_t DEFAULT_WL_THRESHOLD = 2000;  // przykładowo ~50% skali ADC
 // Pump
 const uint8_t DEFAULT_PUMP_PIN = 25;
 const uint32_t DEFAULT_PUMP_RUN_MS = 3000;
-const int DEFAULT_SOIL_THRESHOLD = 30;
+const int DEFAULT_SOIL_THRESHOLD = 50;
 // Battery Monitor
 const uint8_t DEFAULT_BAT_ADC_PIN = 33;
+const int DEFAULT_LOW_BATTERY_MV = 3300; // Np. 3.3V
 // DHT Sensor
 const uint8_t DEFAULT_DHT_PIN = 14;
 const uint8_t DEFAULT_DHT_PWR_PIN = 27; 
@@ -57,7 +58,7 @@ const uint8_t DEFAULT_DHT_PWR_PIN = 27;
 const uint8_t DEFAULT_MPU_INT_PIN = 35; // Domyślny pin dla przerwania MPU (wziety z bat - hcyba nei dziala dobrze)
 // General
 const uint32_t DEFAULT_SLEEP_SECONDS = 86400; // 24 h
-const bool DEFAULT_CONTINUOUS_MODE = true; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
+const bool DEFAULT_CONTINUOUS_MODE = false; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
 //Blynk
 const char* PREF_BLYNK_INTERVAL = "blynkInt";
 const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 30; // Domyślnie co 60 sekund
@@ -66,13 +67,10 @@ static uint32_t blynkSendIntervalSec;
 const uint8_t DEFAULT_BUZZER_PIN = 23; // Domyślny pin dla buzzera
 
 const bool DEFAULT_ALARM_SOUND_ENABLED = true;
-const int DEFAULT_LOW_BATTERY_MV = 3300; // Np. 3.3V
+
 const int DEFAULT_LOW_SOIL_PERCENT = 40; // Np. 20%
 
 const uint8_t DEFAULT_BUTTON_PIN = 32;
-
-static uint8_t  waterLevelGroundPin;
-static uint16_t waterLevelThreshold;
 
 // Zmienne statyczne
 static uint8_t soilSensorPin;
@@ -94,7 +92,8 @@ static int lowSoilPercent;
 static bool alarmSoundEnabled;
 static uint8_t dhtPowerPin;
 static uint8_t buttonPin;
-
+static uint8_t  waterLevelGroundPin;
+static uint16_t waterLevelThreshold;
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 void saveDefaultConfigurationIfNeeded() {
@@ -391,3 +390,42 @@ void clearPreferencesData(const char* namespaceToClear) {
       Serial.printf("  BŁĄD: Nie udało się otworzyć przestrzeni nazw '%s' do zapisu.\n", namespaceToClear);
     }
   }
+
+  void configSetSoilDryADC(int value) {
+    // Walidacja wartości ADC
+    if (value < 0) value = 0;
+    if (value > 4095) value = 4095;
+
+    if (soilAdcDry != value) { // Zapisz tylko jeśli wartość się zmieniła
+        soilAdcDry = value; // Zaktualizuj wartość w RAM
+        preferences.begin(PREF_NAMESPACE, false); // Otwórz R/W
+        preferences.putInt(PREF_SOIL_DRY, soilAdcDry); // Zapisz nową wartość do Flash
+        preferences.end(); // Zamknij
+        Serial.printf("[Config] Zapisano nową wartość kalibracji ADC 'sucho': %d\n", soilAdcDry);
+    }
+}
+
+/**
+ * @brief Ustawia i zapisuje wartość ADC dla całkowicie mokrej (nasyconej) gleby.
+ * @param value Odczyt ADC (0-4095).
+ */
+void configSetSoilWetADC(int value) {
+    // Walidacja wartości ADC
+    if (value < 0) value = 0;
+    if (value > 4095) value = 4095;
+
+     // Dodatkowa walidacja: mokro powinno dać niższy odczyt niż sucho na typowym czujniku pojemnościowym
+     if (value >= soilAdcDry) {
+         Serial.printf("[Config] Ostrzeżenie: Wartość ADC 'mokro' (%d) jest >= wartości 'sucho' (%d). Sprawdź kalibrację.\n", value, soilAdcDry);
+         // Można zdecydować, czy mimo to zapisać, czy odrzucić. Na razie zapisujemy.
+     }
+
+
+    if (soilAdcWet != value) { // Zapisz tylko jeśli wartość się zmieniła
+        soilAdcWet = value; // Zaktualizuj wartość w RAM
+        preferences.begin(PREF_NAMESPACE, false); // Otwórz R/W
+        preferences.putInt(PREF_SOIL_WET, soilAdcWet); // Zapisz nową wartość do Flash
+        preferences.end(); // Zamknij
+        Serial.printf("[Config] Zapisano nową wartość kalibracji ADC 'mokro': %d\n", soilAdcWet);
+    }
+}

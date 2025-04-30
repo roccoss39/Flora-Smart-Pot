@@ -27,7 +27,8 @@
 #define BLYNK_VPIN_ALARM_SOIL_THRESHOLD V14 // Suwak/Input (%) - WYBIERZ WOLNY PIN!
 #define BLYNK_VPIN_CONTINUOUS_MODE V15 // Przełącznik (Switch)
 #define BLYNK_VPIN_ALARM_SOUND_ENABLE V16 // Przełącznik (Switch)
-
+#define BLYNK_VPIN_CALIBRATE_SOIL_DRY V17 // Wartość ADC dla "sucho"
+#define BLYNK_VPIN_CALIBRATE_SOIL_WET V18 // Wartość ADC dla "mokro"
 #define BLYNK_VPIN_MEASUREMENT_HOUR V20 // Input/Widget
 #define BLYNK_VPIN_MEASUREMENT_MINUTE V21 // Input/Widget
 
@@ -176,6 +177,8 @@ BLYNK_CONNECTED() {
     Blynk.syncVirtual(BLYNK_VPIN_ALARM_BAT_THRESHOLD);
     Blynk.syncVirtual(BLYNK_VPIN_ALARM_SOIL_THRESHOLD);
     Blynk.syncVirtual(BLYNK_VPIN_WATER_LEVEL_THRESHOLD);
+    Blynk.syncVirtual(BLYNK_VPIN_CALIBRATE_SOIL_DRY);
+    Blynk.syncVirtual(BLYNK_VPIN_CALIBRATE_SOIL_WET);
 
     if (!alarmManagerIsAlarmActive())
     {
@@ -194,14 +197,15 @@ BLYNK_CONNECTED() {
     Blynk.virtualWrite(BLYNK_VPIN_MEASUREMENT_HOUR, configGetMeasurementHour());
     Blynk.virtualWrite(BLYNK_VPIN_MEASUREMENT_MINUTE, configGetMeasurementMinute());
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_SOUND_ENABLE, configIsAlarmSoundEnabled() ? 1 : 0);
-
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_BAT_THRESHOLD, configGetLowBatteryMilliVolts());
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_SOIL_THRESHOLD, configGetLowSoilPercent());
-
     Blynk.virtualWrite(BLYNK_VPIN_ALARM_STATUS, alarmManagerIsAlarmActive() ? 1 : 0); //
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, pumpControlIsRunning() ? 1 : 0);
-
     Blynk.virtualWrite(BLYNK_VPIN_WATER_LEVEL_THRESHOLD, configGetWaterLevelThreshold());
+    Blynk.virtualWrite(BLYNK_VPIN_ALARM_SOIL_THRESHOLD, configGetLowSoilPercent());
+    Blynk.virtualWrite(BLYNK_VPIN_WATER_LEVEL_THRESHOLD, configGetWaterLevelThreshold());
+    Blynk.virtualWrite(BLYNK_VPIN_CALIBRATE_SOIL_DRY, configGetSoilDryADC());
+    Blynk.virtualWrite(BLYNK_VPIN_CALIBRATE_SOIL_WET, configGetSoilWetADC());
     Serial.println("[Blynk] Synchronizacja zakończona.");
 }
 
@@ -230,4 +234,25 @@ BLYNK_WRITE(BLYNK_VPIN_WATER_LEVEL_THRESHOLD) {
   uint16_t newThreshold = param.asInt(); // Odczytaj wartość z widgetu
   Serial.printf("[Blynk] Otrzymano nowy próg ADC poziomu wody na V%d: %u\n", BLYNK_VPIN_WATER_LEVEL_THRESHOLD, newThreshold);
   configSetWaterLevelThreshold(newThreshold); // Użyj settera z DeviceConfig
+}
+
+BLYNK_WRITE(BLYNK_VPIN_CALIBRATE_SOIL_DRY) {
+  int adcValue = param.asInt();
+  // Podstawowa walidacja wartości ADC
+  if (adcValue < 0) adcValue = 0;
+  if (adcValue > 4095) adcValue = 4095;
+
+  Serial.printf("[Blynk] Otrzymano nową wartość kalibracji 'sucho' (ADC) na V%d: %d\n", BLYNK_VPIN_CALIBRATE_SOIL_DRY, adcValue);
+  configSetSoilDryADC(adcValue); // Wywołaj setter z DeviceConfig
+}
+
+// Handler dla ustawienia wartości ADC "mokro"
+BLYNK_WRITE(BLYNK_VPIN_CALIBRATE_SOIL_WET) {
+  int adcValue = param.asInt();
+  // Podstawowa walidacja wartości ADC
+  if (adcValue < 0) adcValue = 0;
+  if (adcValue > 4095) adcValue = 4095;
+
+  Serial.printf("[Blynk] Otrzymano nową wartość kalibracji 'mokro' (ADC) na V%d: %d\n", BLYNK_VPIN_CALIBRATE_SOIL_WET, adcValue);
+  configSetSoilWetADC(adcValue); // Wywołaj setter z DeviceConfig
 }

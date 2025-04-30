@@ -83,5 +83,15 @@ bool configIsAlarmSoundEnabled();
 void configSetAlarmSoundEnabled(bool enabled);
 void configSetLowBatteryMilliVolts(int mv);
 void configSetLowSoilPercent(int percent); // Próg dla alarmu wilgotności
+/**
+ * @brief Ustawia i zapisuje wartość ADC dla całkowicie suchej gleby.
+ * @param value Odczyt ADC (0-4095).
+ */
+void configSetSoilDryADC(int value);
 
+/**
+ * @brief Ustawia i zapisuje wartość ADC dla całkowicie mokrej (nasyconej) gleby.
+ * @param value Odczyt ADC (0-4095).
+ */
+void configSetSoilWetADC(int value);
 #endif // DEVICECONFIG_H

@@ -38,8 +38,8 @@ void print_wakeup_reason();
 #ifndef LED_BUILTIN
 #define LED_BUILTIN 2
 #endif
-#define WEBPORTAL_TIMEOUT 15
-#define WIFI_CONNECTION_TIMEOUT 120
+#define WEBPORTAL_TIMEOUT 120
+#define WIFI_CONNECTION_TIMEOUT 20
 
 // Czas ostatniego cyklu pomiarowego
 static int unsigned long lastMeasurementTime = 0;
@@ -47,6 +47,8 @@ static int unsigned long lastMeasurementTime = 0;
 // --- Główna funkcja Setup ---
 void setup() {
     Serial.begin(115200);
+    delay(100);
+    clearPreferencesData("flaura_cfg_1");
     Serial.println("\n--- Flaura Smart Pot - Główny Start ---");
     print_wakeup_reason();
 
@@ -91,7 +93,6 @@ void setup() {
     // Wyświetl wyniki pierwszego pomiaru
     displayMeasurements(g_latestSensorData); // Wywołaj funkcję wyświetlającą
 
-
      // --- Logika połączenia WiFi - POPRAWIONA WERSJA ---
      bool connectSuccess = false;
      esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -100,12 +101,11 @@ void setup() {
      WiFiManager wm; // Utwórz obiekt WiFiManager
      //wm.resetSettings(); // Odkomentuj do testów resetowania ustawień WiFi
      wm.setConnectTimeout(WIFI_CONNECTION_TIMEOUT); // Czas próby połączenia z zapisaną siecią (sekundy)
-     // Ustaw timeout portalu WARUNKOWO na podstawie przyczyny uruchomienia
      if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
          // Przyczyna: Reset lub Power-On
          Serial.println("[WiFi] Wykryto Reset/Power-On. Ustawiam timeout portalu na 120s.");
-         wm.setConfigPortalTimeout(WEBPORTAL_TIMEOUT); // Portal będzie aktywny przez 120s, jeśli autoConnect nie połączy się z zapisaną siecią
-     } else {
+         wm.setConfigPortalTimeout(WEBPORTAL_TIMEOUT); 
+        } else {
          // Przyczyna: Wybudzenie z Deep Sleep (Timer, GPIO itp.)
          Serial.println("[WiFi] Wykryto wybudzenie z Deep Sleep. Ustawiam timeout portalu na 0s.");
          wm.setConfigPortalTimeout(0); // Portal NIE powinien uruchomić się automatycznie po nieudanym autoConnect
