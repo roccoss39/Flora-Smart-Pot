@@ -2,10 +2,8 @@
 #include <Wire.h>
 #include <esp_sleep.h>
 #include <cmath>
-
 #include <WiFi.h>
 #include <WiFiManager.h>
-
 // Nasze moduły
 #include "DeviceConfig.h"
 #include "secrets.h"         // Potrzebne dla BLYNK_AUTH_TOKEN
@@ -20,7 +18,6 @@
 #include <Preferences.h>
 #include "ButtonManager.h"
 
-
 // --- NOWOŚĆ: Struktura do przechowywania danych z pomiarów ---
 struct SensorData {
     int soilMoisture = -1;
@@ -30,37 +27,22 @@ struct SensorData {
     float humidity = NAN;
     bool dhtOk = false;
     // Można dodać inne odczyty w przyszłości
-};
+} g_latestSensorData; 
 
 // --- Deklaracje nowych funkcji ---
 SensorData performMeasurement();
 void displayMeasurements(const SensorData& data);
-
-// Funkcja pomocnicza do drukowania przyczyny wybudzenia
-// ... (bez zmian) ...
-void print_wakeup_reason(){
-  esp_sleep_wakeup_cause_t wakeup_reason;
-  wakeup_reason = esp_sleep_get_wakeup_cause();
-  Serial.print("Przyczyna uruchomienia/wybudzenia: ");
-  switch(wakeup_reason)
-  {
-    case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("EXT0 (zewnętrzne przerwanie 0)"); break;
-    case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("EXT1 (zewnętrzne przerwanie 1)"); break;
-    case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Touchpad"); break;
-    case ESP_SLEEP_WAKEUP_ULP : Serial.println("ULP Program"); break;
-    default : Serial.printf("Reset lub Power On (przyczyna nr %d)\n", wakeup_reason); break;
-  }
-}
-
+void print_wakeup_reason();
 
 // Wbudowana dioda LED
 #ifndef LED_BUILTIN
 #define LED_BUILTIN 2
 #endif
+#define WEBPORTAL_TIMEOUT 15
+#define WIFI_CONNECTION_TIMEOUT 120
 
 // Czas ostatniego cyklu pomiarowego
-unsigned long lastMeasurementTime = 0;
+static int unsigned long lastMeasurementTime = 0;
 
 // --- Główna funkcja Setup ---
 void setup() {
@@ -87,12 +69,13 @@ void setup() {
 
     digitalWrite(LED_BUILTIN, LOW);
 
+    
     // --- ZAWSZE WYKONAJ PIERWSZY POMIAR ---
     Serial.println("\n--- Pierwszy pomiar/cykl po starcie/wybudzeniu ---");
-    SensorData initialData = performMeasurement(); // Wywołaj funkcję pomiarową
+    g_latestSensorData = performMeasurement(); // Wywołaj funkcję pomiarową
 
     // Aktualizuj stan alarmu na podstawie pierwszego pomiaru
-    alarmManagerUpdate(initialData.waterLevel, initialData.batteryVoltage, initialData.soilMoisture);
+    alarmManagerUpdate(g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage, g_latestSensorData.soilMoisture);
 
     // Sprawdź alarm i ewentualnie wymuś tryb ciągły
      if (alarmManagerIsAlarmActive()) {
@@ -106,7 +89,7 @@ void setup() {
      }
 
     // Wyświetl wyniki pierwszego pomiaru
-    displayMeasurements(initialData); // Wywołaj funkcję wyświetlającą
+    displayMeasurements(g_latestSensorData); // Wywołaj funkcję wyświetlającą
 
 
      // --- Logika połączenia WiFi - POPRAWIONA WERSJA ---
@@ -115,17 +98,13 @@ void setup() {
  
      WiFi.mode(WIFI_STA);
      WiFiManager wm; // Utwórz obiekt WiFiManager
- 
      //wm.resetSettings(); // Odkomentuj do testów resetowania ustawień WiFi
-  
-     wm.setConnectTimeout(20); // Czas próby połączenia z zapisaną siecią (sekundy)
-
- 
+     wm.setConnectTimeout(WIFI_CONNECTION_TIMEOUT); // Czas próby połączenia z zapisaną siecią (sekundy)
      // Ustaw timeout portalu WARUNKOWO na podstawie przyczyny uruchomienia
      if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
          // Przyczyna: Reset lub Power-On
          Serial.println("[WiFi] Wykryto Reset/Power-On. Ustawiam timeout portalu na 120s.");
-         wm.setConfigPortalTimeout(20); // Portal będzie aktywny przez 120s, jeśli autoConnect nie połączy się z zapisaną siecią
+         wm.setConfigPortalTimeout(WEBPORTAL_TIMEOUT); // Portal będzie aktywny przez 120s, jeśli autoConnect nie połączy się z zapisaną siecią
      } else {
          // Przyczyna: Wybudzenie z Deep Sleep (Timer, GPIO itp.)
          Serial.println("[WiFi] Wykryto wybudzenie z Deep Sleep. Ustawiam timeout portalu na 0s.");
@@ -174,20 +153,17 @@ void setup() {
     // Wyślij pierwsze dane do Blynk TYLKO jeśli jest połączenie
     if (connectSuccess && blynkIsConnected()) {
         Serial.println("Wysyłanie pierwszych danych do Blynk...");
-        // Użyj danych z initialData
-        blynkSendSensorData(initialData.soilMoisture, initialData.waterLevel, initialData.batteryVoltage,
-                             initialData.temperature, initialData.humidity,
+        // Użyj danych z g_latestSensorData
+        blynkSendSensorData(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage,
+                             g_latestSensorData.temperature, g_latestSensorData.humidity,
                              NAN, false, pumpControlIsRunning());
-        lastMeasurementTime = millis();
     } else {
-        Serial.println("Pomijam wysyłkę pierwszych danych - brak połączenia.");
-        // Ustaw czas ostatniego pomiaru, nawet jeśli nie wysłano
-         lastMeasurementTime = millis();
+        Serial.println("Pomijam wysyłkę pierwszych danych - brak połączenia.");         
     }
-
+    lastMeasurementTime = millis();
     // Kontrola pompy na podstawie pierwszego pomiaru - ZAWSZE
-    // Użyj danych z initialData
-    pumpControlActivateIfNeeded(initialData.soilMoisture, initialData.waterLevel);
+    // Użyj danych z g_latestSensorData
+    pumpControlActivateIfNeeded(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel);
 
     // --- Przejście w Deep Sleep (zależne od trybu) ---
     if (!configIsContinuousMode()) {
@@ -210,11 +186,7 @@ void setup() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // --- Główna pętla Loop ---
 void loop() {
-    // Zmienne statyczne do przechowywania ostatnich odczytów dla alarmu
-
-    // --- ZAWSZE WYKONYWANE ---
     pumpControlUpdate();
-
     // --- OBSŁUGA SIECI (jeśli jest połączenie WiFi) ---
     if (WiFi.status() == WL_CONNECTED) {
        if (!blynkIsConnected()) {
@@ -234,85 +206,45 @@ void loop() {
     // --- GŁÓWNA LOGIKA CYKLICZNA (Pomiar, Sterowanie) ---
     if (configIsContinuousMode()) {
         // --- Tryb Ciągły ---
-        static int lastMoisture = -1;
-        static int lastWaterLevel = -1;
-        static float lastBatteryVoltage = -1.0f;
 
-        if (buttonWasPressed()) { // Wywołaj funkcję z ButtonManager
-            // Jeśli zwróciła true (przycisk naciśnięty) - wykonaj akcje:
-            Serial.println("\n[Main] Wykryto sygnał naciśnięcia przycisku - Wywołuję ręczny pomiar!");
-
-            // Krok 1: Odczytaj sensory
-            SensorData manualData = performMeasurement();
-            // Zaktualizuj ostatnie znane wartości
-            if (manualData.soilMoisture >= 0) lastMoisture = manualData.soilMoisture;
-            lastWaterLevel = manualData.waterLevel;
-            if (manualData.batteryVoltage > 0) lastBatteryVoltage = manualData.batteryVoltage;
-
-            // Krok 2: Wyświetl wyniki lokalnie
-            displayMeasurements(manualData);
-
-            
-            // Krok 3: Wyślij dane do Blynk (TYLKO jeśli jest połączenie)
-            if (WiFi.status() == WL_CONNECTED && blynkIsConnected()) {
-                 Serial.println("Wysyłanie danych do Blynk (po naciśnięciu przycisku)...");
-                 blynkSendSensorData(manualData.soilMoisture, manualData.waterLevel, manualData.batteryVoltage,
-                                      manualData.temperature, manualData.humidity,
-                                      NAN, false, pumpControlIsRunning());
-            } else {
-                 Serial.println("Pomijam wysyłkę do Blynk - brak połączenia.");
-            }
-
-            alarmManagerUpdate(lastWaterLevel, lastBatteryVoltage, lastMoisture);
-
-            // Krok 4: Aktywuj pompę jeśli potrzeba
-            pumpControlActivateIfNeeded(manualData.soilMoisture, manualData.waterLevel);
-
-            // Krok 5: Zresetuj timer cyklicznych pomiarów
-            lastMeasurementTime = millis();
-            Serial.println("[Main] Ręczny pomiar zakończony. Timer okresowy zresetowany.");
-
-            
-       }
-       
-        uint32_t interval = 30 * 1000;
+        uint32_t interval = configGetBlynkSendIntervalSec() * 1000;
         if (interval == 0) interval = 60000;
 
         // Sprawdź, czy nadszedł czas na kolejny cykl pomiarowy
-        if (millis() - lastMeasurementTime > interval) {
+        if ((millis() - lastMeasurementTime > interval) || buttonWasPressed()) {
 
             // --- Krok 1: Odczytaj sensory (niezależnie od WiFi) ---
-            SensorData currentData = performMeasurement(); // Wywołaj funkcję pomiarową
+            g_latestSensorData = performMeasurement(); // Wywołaj funkcję pomiarową
 
             // Zaktualizuj ostatnie znane wartości (dla alarmu na końcu pętli)
-            if (currentData.soilMoisture >= 0) lastMoisture = currentData.soilMoisture;
-            lastWaterLevel = currentData.waterLevel;
-            if (currentData.batteryVoltage > 0) lastBatteryVoltage = currentData.batteryVoltage;
+            if (g_latestSensorData.soilMoisture >= 0) g_latestSensorData.soilMoisture = g_latestSensorData.soilMoisture;
+            g_latestSensorData.waterLevel = g_latestSensorData.waterLevel;
+            if (g_latestSensorData.batteryVoltage > 0) g_latestSensorData.batteryVoltage = g_latestSensorData.batteryVoltage;
 
             // --- Krok 2: Wyświetl wyniki lokalnie (niezależnie od WiFi) ---
-            displayMeasurements(currentData); // Wywołaj funkcję wyświetlającą
+            displayMeasurements(g_latestSensorData); // Wywołaj funkcję wyświetlającą
 
             // --- Krok 3: Wyślij dane do Blynk (TYLKO jeśli jest połączenie) ---
             if (WiFi.status() == WL_CONNECTED && blynkIsConnected()) {
                  Serial.println("Wysyłanie danych do Blynk...");
-                 // Użyj danych z currentData
-                 blynkSendSensorData(currentData.soilMoisture, currentData.waterLevel, currentData.batteryVoltage,
-                                      currentData.temperature, currentData.humidity,
+                 // Użyj danych z g_latestSensorData
+                 blynkSendSensorData(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage,
+                                      g_latestSensorData.temperature, g_latestSensorData.humidity,
                                       NAN, false, pumpControlIsRunning());
             } else {
                  Serial.println("Pomijam wysyłkę do Blynk - brak połączenia.");
             }
+            
+            Serial.print("Stan alarmu: ");
+            Serial.println(alarmManagerIsAlarmActive());
 
-            alarmManagerUpdate(lastWaterLevel, lastBatteryVoltage, lastMoisture);
-            // --- Krok 4: Aktywuj pompę jeśli potrzeba (niezależnie od WiFi) ---
-            // Użyj danych z currentData
-            pumpControlActivateIfNeeded(currentData.soilMoisture, currentData.waterLevel);
+            // Użyj danych z g_latestSensorData
+            pumpControlActivateIfNeeded(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel);
 
             // --- Krok 5: Zaktualizuj czas ostatniego pomiaru ---
             lastMeasurementTime = millis();
             
-        } // koniec if (czas na pomiar)
-
+        } 
     } else {
         // --- Tryb Deep Sleep ---
         if (!pumpControlIsRunning()) {
@@ -324,11 +256,7 @@ void loop() {
              powerManagerGoToDeepSleep();
         }
     }
-
-    // --- ZAWSZE WYKONYWANE na końcu pętli ---
-    // Aktualizacja stanu alarmu na podstawie ostatnich poprawnych odczytów
-
-
+    alarmManagerUpdate(g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage, g_latestSensorData.soilMoisture);
     delay(10);
 
 } // Koniec loop()
@@ -379,3 +307,17 @@ void displayMeasurements(const SensorData& data) {
     }
     Serial.println("-----------------------");
 }
+void print_wakeup_reason(){
+    esp_sleep_wakeup_cause_t wakeup_reason;
+    wakeup_reason = esp_sleep_get_wakeup_cause();
+    Serial.print("Przyczyna uruchomienia/wybudzenia: ");
+    switch(wakeup_reason)
+    {
+      case ESP_SLEEP_WAKEUP_EXT0 : Serial.println("EXT0 (zewnętrzne przerwanie 0)"); break;
+      case ESP_SLEEP_WAKEUP_EXT1 : Serial.println("EXT1 (zewnętrzne przerwanie 1)"); break;
+      case ESP_SLEEP_WAKEUP_TIMER : Serial.println("Timer"); break;
+      case ESP_SLEEP_WAKEUP_TOUCHPAD : Serial.println("Touchpad"); break;
+      case ESP_SLEEP_WAKEUP_ULP : Serial.println("ULP Program"); break;
+      default : Serial.printf("Reset lub Power On (przyczyna nr %d)\n", wakeup_reason); break;
+    }
+  }

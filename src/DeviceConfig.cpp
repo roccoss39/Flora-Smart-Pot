@@ -60,7 +60,7 @@ const uint32_t DEFAULT_SLEEP_SECONDS = 86400; // 24 h
 const bool DEFAULT_CONTINUOUS_MODE = true; // !! DOMYŚLNIE Deep Sleep !! Zmień na true do debugowania.
 //Blynk
 const char* PREF_BLYNK_INTERVAL = "blynkInt";
-const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 12000; // Domyślnie co 60 sekund
+const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 30; // Domyślnie co 60 sekund
 static uint32_t blynkSendIntervalSec;
 
 const uint8_t DEFAULT_BUZZER_PIN = 23; // Domyślny pin dla buzzera
@@ -366,3 +366,28 @@ void configSetLowSoilPercent(int percent) {
         Serial.printf("[Config] Zapisano nowy próg alarmu wilgotności gleby: %d %%\n", lowSoilPercent);
     }
 }
+
+void clearPreferencesData(const char* namespaceToClear) {
+    Preferences preferences;
+  
+    Serial.printf("Próba wyczyszczenia przestrzeni nazw Preferences: '%s'\n", namespaceToClear);
+  
+    // Otwórz przestrzeń nazw w trybie zapisu (drugi argument false)
+    if (preferences.begin(namespaceToClear, false)) {
+      Serial.println("  Przestrzeń nazw otwarta...");
+  
+      // Wykonaj czyszczenie
+      if (preferences.clear()) {
+        Serial.println("  Sukces! Wszystkie dane w tej przestrzeni nazw zostały usunięte.");
+      } else {
+        Serial.println("  BŁĄD: Nie udało się wyczyścić danych.");
+      }
+  
+      // Zawsze zamykaj po zakończeniu operacji
+      preferences.end();
+      Serial.println("  Przestrzeń nazw zamknięta.");
+  
+    } else {
+      Serial.printf("  BŁĄD: Nie udało się otworzyć przestrzeni nazw '%s' do zapisu.\n", namespaceToClear);
+    }
+  }

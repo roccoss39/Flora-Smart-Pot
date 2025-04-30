@@ -42,17 +42,17 @@ void alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture) 
     }
 
         // Wypisanie wartości argumentów
-        Serial.print("waterLevel: ");
-        Serial.println(waterLevel);
+        // Serial.print("waterLevel: ");
+        // Serial.println(waterLevel);
         
-        Serial.print("batteryVoltage: ");
-        Serial.println(batteryVoltage);
+        // Serial.print("batteryVoltage: ");
+        // Serial.println(batteryVoltage);
         
-        Serial.print("soilMoisture: ");
-        Serial.println(soilMoisture);
+        // Serial.print("soilMoisture: ");
+        // Serial.println(soilMoisture);
 
-        Serial.print("stan alarmu: ");
-        Serial.println(isAlarmActive);
+        // Serial.print("stan alarmu: ");
+        // Serial.println(isAlarmActive);
 
     // Odczytaj progi alarmowe z konfiguracji
     int lowSoilThreshold = configGetLowSoilPercent();

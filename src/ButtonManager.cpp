@@ -30,7 +30,6 @@ bool buttonWasPressed() {
     if (buttonPin == 255 || !configIsContinuousMode()) {
         return false;
     }
-
     bool pressedEvent = false; // Flaga sygnalizująca wykrycie naciśnięcia
     int reading = digitalRead(buttonPin); // Odczytaj aktualny stan pinu
 
@@ -48,7 +47,7 @@ bool buttonWasPressed() {
             // Jeśli nowym stabilnym stanem jest LOW (przycisk właśnie został naciśnięty)
             if (buttonState == LOW) {
                 pressedEvent = true; // Zasygnalizuj zdarzenie naciśnięcia
-                Serial.println("[Button] Wykryto potwierdzone naciśnięcie przycisku.");
+                Serial.println("\n[Main] Wykryto sygnał naciśnięcia przycisku - Wywołuję ręczny pomiar!");
             } else {
                 // Przycisk został właśnie puszczony (przejście z LOW na HIGH)
                  Serial.println("[Button] Wykryto puszczenie przycisku.");

@@ -6,7 +6,7 @@
 // Funkcje do zarządzania konfiguracją
 void configSetup();
 bool configIsContinuousMode();
-
+void clearPreferencesData(const char* namespaceToClear);
 // Gettery dla czujnika wilgotności gleby
 uint8_t configGetSoilPin();
 int configGetSoilDryADC();
