@@ -117,9 +117,9 @@ void setup() {
      WiFiManager wm; // Utwórz obiekt WiFiManager
  
      //wm.resetSettings(); // Odkomentuj do testów resetowania ustawień WiFi
- 
-      // Ustawienia WiFiManager
+  
      wm.setConnectTimeout(20); // Czas próby połączenia z zapisaną siecią (sekundy)
+
  
      // Ustaw timeout portalu WARUNKOWO na podstawie przyczyny uruchomienia
      if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
