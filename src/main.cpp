@@ -48,7 +48,7 @@ static int unsigned long lastMeasurementTime = 0;
 void setup() {
     Serial.begin(115200);
     delay(100);
-    //clearPreferencesData("flaura_cfg_1");
+    clearPreferencesData("flaura_cfg_1");
     Serial.println("\n--- Flaura Smart Pot - Główny Start ---");
     print_wakeup_reason();
 
