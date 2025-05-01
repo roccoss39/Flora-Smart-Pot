@@ -83,12 +83,6 @@ void setup() {
     // Sprawdź alarm i ewentualnie wymuś tryb ciągły
      if (alarmManagerIsAlarmActive()) {
         Serial.println("[SETUP] Wykryto aktywny alarm!");
-        if (!configIsContinuousMode()) {
-            Serial.println("[SETUP] Przełączam na tryb ciągły z powodu alarmu...");
-            configSetContinuousMode(true);
-        } else {
-            Serial.println("[SETUP] Już w trybie ciągłym.");
-        }
      }
 
     // Wyświetl wyniki pierwszego pomiaru
@@ -167,7 +161,7 @@ void setup() {
     pumpControlActivateIfNeeded(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel);
 
     // --- Przejście w Deep Sleep (zależne od trybu) ---
-    if (!configIsContinuousMode()) {
+    if (!configIsContinuousMode() && !alarmManagerIsAlarmActive()) {
         if (pumpControlIsRunning()) {
             Serial.println("Pompa pracuje - pozostaję w trybie aktywnym (przejście do loop).");
         } else {
@@ -246,7 +240,7 @@ void loop() {
         } 
     } else {
         // --- Tryb Deep Sleep ---
-        if (!pumpControlIsRunning()) {
+        if (!pumpControlIsRunning() && !alarmManagerIsAlarmActive()) {
              Serial.println("[Loop] Pompa zakończyła pracę w trybie Deep Sleep, przechodzę do uśpienia...");
              digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
              if (blynkIsConnected()){
