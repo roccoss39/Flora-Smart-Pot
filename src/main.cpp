@@ -276,9 +276,6 @@ SensorData performMeasurement() {
     SensorData data; // Struktura na wyniki
 
     data.soilMoisture = soilSensorReadPercent();
-    // *** DEBUG: Dodaj ten log ***
-    Serial.printf("[Debug] soilSensorReadPercent() zwróciło: %d\n", data.soilMoisture);
-    // ***************************
     data.waterLevel = waterLevelSensorReadLevel();
     data.waterLevel = waterLevelSensorReadLevel();
     data.batteryVoltage = batteryMonitorReadVoltage();
