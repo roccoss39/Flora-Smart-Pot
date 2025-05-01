@@ -3,103 +3,150 @@
 
 #include <stdint.h>
 
-// Funkcje do zarządzania konfiguracją
+// -----------------------------------------------------------------------------
+// Inicjalizacja i czyszczenie konfiguracji
+// -----------------------------------------------------------------------------
+/**
+ * @brief Wczytuje (i tworzy domyślną, jeśli trzeba) wszystkie ustawienia z flash.
+ */
 void configSetup();
+
+/**
+ * @brief Czy urządzenie pracuje w trybie ciągłym (bez deep sleep)?
+ */
 bool configIsContinuousMode();
-void clearPreferencesData(const char* namespaceToClear);
-// Gettery dla czujnika wilgotności gleby
-uint8_t configGetSoilPin();
-int configGetSoilDryADC();
-int configGetSoilWetADC();
-int configGetSoilVccPin();
-
-// Gettery dla czujnika poziomu wody
-uint8_t configGetWaterLevelPin(int level); // Dla poziomów 1-5
-
-// Nowe gettery dla sondy poziomu wody
-uint8_t  configGetWaterLevelGroundPin();   // wspólna sonda (wejście analogowe)
-uint16_t configGetWaterLevelThreshold();    // próg ADC do detekcji wody
-
-// Settery dla sondy poziomu wody
-void configSetWaterLevelGroundPin(uint8_t pin);
-void configSetWaterLevelThreshold(uint16_t threshold);
-
-// Gettery dla pompki
-uint8_t configGetPumpPin();
-uint32_t configGetPumpRunMillis();
-int configGetSoilThresholdPercent();
-
-// Getter dla pinu ADC baterii
-uint8_t configGetBatteryAdcPin();
-
-// Getter dla pinu DHT11
-uint8_t configGetDhtPin();
-uint8_t configGetDhtPowerPin();
-// Getter dla pinu INT MPU6500
-uint8_t configGetMpuIntPin();
-
-// Getter dla czasu uśpienia
-uint32_t configGetSleepSeconds();
-
-uint32_t configGetBlynkSendIntervalSec();
-
-void configSetPumpRunMillis(uint32_t durationMs);
-
-void configSetSoilThresholdPercent(int threshold);
-
-/**
- * @brief Pobiera ustawioną godzinę codziennego pomiaru
- * @return Godzina jako liczba 0-23
- */
-int configGetMeasurementHour();
-
-/**
- * @brief Pobiera ustawioną minutę codziennego pomiaru
- * @return Minuta jako liczba 0-59
- */
-int configGetMeasurementMinute();
-
-/**
- * @brief Ustawia czas codziennego pomiaru
- * @param hour Godzina (0-23)
- * @param minute Minuta (0-59)
- * @return true jeśli ustawiono poprawnie
- */
-bool configSetMeasurementTime(int hour, int minute);
 
 /**
  * @brief Ustawia i zapisuje tryb pracy urządzenia.
- * @param enabled true dla trybu ciągłego, false dla trybu Deep Sleep.
+ * @param enabled true = ciągły, false = Deep Sleep 
  */
 void configSetContinuousMode(bool enabled);
 
-uint8_t configGetBuzzerPin();
-int configGetLowBatteryMilliVolts(); // Getter dla progu baterii (mV)
-int configGetLowSoilPercent();  
-
-uint8_t configGetButtonPin();
-
+/**
+ * @brief Czy dźwięk alarmu jest włączony?
+ */
 bool configIsAlarmSoundEnabled();
-void configSetAlarmSoundEnabled(bool enabled);
-void configSetLowBatteryMilliVolts(int mv);
-void configSetLowSoilPercent(int percent); // Próg dla alarmu wilgotności
+
 /**
- * @brief Ustawia i zapisuje wartość ADC dla całkowicie suchej gleby.
- * @param value Odczyt ADC (0-4095).
+ * @brief Czyści wszystkie zapisane dane w danej przestrzeni nazw Preferences.
  */
+void clearPreferencesData(const char* namespaceToClear);
+
+
+// -----------------------------------------------------------------------------
+// Gettery – ogólne
+// -----------------------------------------------------------------------------
+/** Czas codziennego pomiaru – godzina (0–23) */
+int  configGetMeasurementHour();
+/** Czas codziennego pomiaru – minuta (0–59) */
+int  configGetMeasurementMinute();
+/** Interwał wysyłania do Blynka w sekundach */
+uint32_t configGetBlynkSendIntervalSec();
+/** Czas uśpienia po zakończeniu cyklu (w sekundach) */
+uint32_t configGetSleepSeconds();
+
+
+// -----------------------------------------------------------------------------
+// Gettery – czujnik wilgotności gleby
+// -----------------------------------------------------------------------------
+/** Numer pinu ADC czujnika gleby */
+uint8_t configGetSoilPin();
+/** Kalibracja „sucho” (ADC) */
+int     configGetSoilDryADC();
+/** Kalibracja „mokro” (ADC) */
+int     configGetSoilWetADC();
+/** Pin zasilania czujnika gleby (VCC) */
+int     configGetSoilVccPin();
+/** Próg wilgotności gleby (%) do alarmu/pompy */
+int     configGetSoilThresholdPercent();
+
+
+// -----------------------------------------------------------------------------
+// Gettery – czujnik poziomu wody
+// -----------------------------------------------------------------------------
+/** Numer pinu cyfrowego dla poziomu wody 1–5 */
+uint8_t  configGetWaterLevelPin(int level);
+/** Numer pinu wspólnej sondy (analog) */
+uint8_t  configGetWaterLevelGroundPin();
+/** Próg ADC detekcji wody (0–4095) */
+uint16_t configGetWaterLevelThreshold();
+
+
+// -----------------------------------------------------------------------------
+// Gettery – pompa
+// -----------------------------------------------------------------------------
+/** Numer pinu sterującego pompą */
+uint8_t  configGetPumpPin();
+/** Czas pracy pompy w milisekundach */
+uint32_t configGetPumpRunMillis();
+/** Maksymalna moc pompy (duty cycle 0–255) */
+uint8_t  configGetPumpDutyCycle();
+
+
+// -----------------------------------------------------------------------------
+// Gettery – zasilanie i czujniki pomocnicze
+// -----------------------------------------------------------------------------
+/** Numer pinu ADC do pomiaru baterii */
+uint8_t  configGetBatteryAdcPin();
+/** Numer pinu DHT11 (temperatura/ wilgotność) */
+uint8_t  configGetDhtPin();
+/** Numer pinu zasilania DHT11 (opcjonalne) */
+uint8_t  configGetDhtPowerPin();
+/** Numer pinu INT od MPU6500 */
+uint8_t  configGetMpuIntPin();
+/** Numer pinu przycisku (wybudzanie EXT0) */
+uint8_t  configGetButtonPin();
+/** Numer pinu buzzera */
+uint8_t  configGetBuzzerPin();
+/** Próg niskiego napięcia baterii (mV) */
+int      configGetLowBatteryMilliVolts();
+/** Próg niskiej wilgotności gleby (%) dla alarmu */
+int      configGetLowSoilPercent();
+
+
+// -----------------------------------------------------------------------------
+// Settery – czujnik wilgotności gleby
+// -----------------------------------------------------------------------------
+/** Ustawia zapisaną kalibrację ADC „sucho” */
 void configSetSoilDryADC(int value);
+/** Ustawia zapisaną kalibrację ADC „mokro” */
+void configSetSoilWetADC(int value);
+/** Ustawia próg wilgotności gleby (%) */
+void configSetSoilThresholdPercent(int threshold);
+
+
+// -----------------------------------------------------------------------------
+// Settery – czujnik poziomu wody
+// -----------------------------------------------------------------------------
+/** Ustawia pin wspólnej sondy wody */
+void configSetWaterLevelGroundPin(uint8_t pin);
+/** Ustawia próg ADC detekcji wody */
+void configSetWaterLevelThreshold(uint16_t threshold);
+
+
+// -----------------------------------------------------------------------------
+// Settery – pompa
+// -----------------------------------------------------------------------------
+/** Ustawia czas pracy pompy (ms) */
+void configSetPumpRunMillis(uint32_t durationMs);
+/** Ustawia moc (duty cycle 0–255) pompy */
+void configSetPumpDutyCycle(uint8_t duty);
+
+
+// -----------------------------------------------------------------------------
+// Settery – alarm i Blynk
+// -----------------------------------------------------------------------------
+/** Ustawia, czy dźwięk alarmu jest włączony */
+void configSetAlarmSoundEnabled(bool enabled);
+/** Ustawia próg niskiego napięcia baterii (mV) */
+void configSetLowBatteryMilliVolts(int mv);
+/** Ustawia próg niskiej wilgotności gleby (%) */
+void configSetLowSoilPercent(int percent);
 
 /**
- * @brief Ustawia i zapisuje wartość ADC dla całkowicie mokrej (nasyconej) gleby.
- * @param value Odczyt ADC (0-4095).
+ * @brief Ustawia czas codziennych pomiarów.
+ * @return true jeśli poprawnie (0–23 dla godziny, 0–59 dla minuty)
  */
-void configSetSoilWetADC(int value);
-// --- NOWOŚĆ: Getter dla mocy pompy ---
-uint8_t configGetPumpDutyCycle(); // Zwraca wartość 0-255
-
-// ... (istniejące deklaracje funkcji configSet...) ...
-
-// --- NOWOŚĆ: Setter dla mocy pompy ---
-void configSetPumpDutyCycle(uint8_t duty); // Ustawia wartość 0-255
+bool configSetMeasurementTime(int hour, int minute);
 
 #endif // DEVICECONFIG_H

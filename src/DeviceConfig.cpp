@@ -34,6 +34,7 @@ const char* PREF_LOW_BAT_MV = "lowBatMv";
 const char* PREF_LOW_SOIL_PCT = "lowSoilPct";
 const char* PREF_BUTTON_PIN = "buttonPin";
 const char* PREF_PUMP_DUTY = "pumpDuty";
+const char* PREF_LED_PIN = "ledPin";
 
 // --- Domyślne wartości konfiguracji ---
 // Soil Sensor - Twoje wartości, z kontrolą VCC
@@ -74,6 +75,9 @@ const int DEFAULT_LOW_SOIL_PERCENT = 40; // Np. 20%
 const uint8_t DEFAULT_BUTTON_PIN = 32;
 
 const uint8_t DEFAULT_PUMP_DUTY = 255; // Domyślnie pełna moc
+
+constexpr uint8_t LED_PIN = 22;
+const uint8_t DEFAULT_LED_PIN = LED_PIN;
 // Zmienne statyczne
 static uint8_t soilSensorPin;
 static int soilAdcDry;
@@ -97,6 +101,7 @@ static uint8_t buttonPin;
 static uint8_t  waterLevelGroundPin;
 static uint16_t waterLevelThreshold;
 static uint8_t pumpDutyCycle;
+static uint8_t ledPin;
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 void saveDefaultConfigurationIfNeeded() {
@@ -122,6 +127,7 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
         preferences.putUChar(PREF_BUTTON_PIN, DEFAULT_BUTTON_PIN);
         preferences.putUChar(PREF_PUMP_DUTY, DEFAULT_PUMP_DUTY);
+        preferences.putUChar(PREF_LED_PIN, DEFAULT_LED_PIN);
 
         if (!preferences.isKey(PREF_WL_GROUND_PIN)) {
             // tylko raz zapisujemy domyślne ustawienia
@@ -166,6 +172,7 @@ void configSetup() {
     dhtPowerPin = preferences.getUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
     buttonPin = preferences.getUChar(PREF_BUTTON_PIN, DEFAULT_BUTTON_PIN);
     pumpDutyCycle = preferences.getUChar(PREF_PUMP_DUTY, DEFAULT_PUMP_DUTY);
+    ledPin = preferences.getUChar(PREF_LED_PIN, DEFAULT_LED_PIN);
 
     preferences.end();
 
@@ -195,11 +202,13 @@ void configSetup() {
     Serial.printf("  Pin zasilania DHT11: %d\n", dhtPowerPin);
     Serial.printf("  Pin przycisku (wybudzania EXT0): %d\n", buttonPin);
     Serial.printf("  Moc pompy (Duty Cycle): %d/255\n", pumpDutyCycle);
+    Serial.printf("  Blue LED Pin: %d (\n", ledPin);
 
     Serial.println("--------------------");
 }
 
 // Gettery
+uint8_t configGetLedPin() { return ledPin; }
 uint8_t configGetPumpDutyCycle() { return pumpDutyCycle; }
 bool configIsContinuousMode() { return continuousMode; }
 uint8_t configGetSoilPin() { return soilSensorPin; }

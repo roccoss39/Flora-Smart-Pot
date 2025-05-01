@@ -1,20 +1,26 @@
-#ifndef ALARMMANAGER_H
-#define ALARMMANAGER_H
+// AlarmManager.h
+#ifndef ALARM_MANAGER_H
+#define ALARM_MANAGER_H
 
 /**
- * @brief Inicjalizuje moduł alarmu (konfiguruje pin buzzera).
+ * @brief Initializes the alarm module (configures buzzer pin)
  */
 void alarmManagerSetup();
 
 /**
- * @brief Aktualizuje stan alarmu i steruje buzzerem na podstawie odczytów.
- * Należy wywoływać regularnie w pętli lub po odczycie sensorów.
- * @param waterLevel Aktualny odczytany poziom wody (0-5).
- * @param batteryVoltage Aktualne napięcie baterii (V).
- * @param soilMoisture Aktualna wilgotność gleby (%).
+ * @brief Updates alarm state and controls buzzer based on readings.
+ * Should be called regularly in loop or after sensor reads.
+ * @param waterLevel Current water level reading (0-5)
+ * @param batteryVoltage Current battery voltage (V)
+ * @param soilMoisture Current soil moisture (%)
+ * @return true if alarm state changed, false otherwise
  */
 bool alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture);
 
-bool alarmManagerIsAlarmActive(); // <-- Dodaj tę deklarację
+/**
+ * @brief Returns current alarm state regardless of sound setting
+ * @return true if any alarm condition is met, false otherwise
+ */
+bool alarmManagerIsAlarmActive();
 
-#endif // ALARMMANAGER_H
+#endif // ALARM_MANAGER_H

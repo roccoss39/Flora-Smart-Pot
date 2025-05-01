@@ -1,37 +1,41 @@
-#ifndef PUMPCONTROL_H
-#define PUMPCONTROL_H
+// PumpControl.h - Niewielkie poprawki
+#ifndef PUMP_CONTROL_H
+#define PUMP_CONTROL_H
 
 #include <stdint.h>
 
 /**
- * @brief Inicjalizuje pin sterujący pompą.
+ * @brief Initializes the pump control pin with PWM capabilities
  */
 void pumpControlSetup();
 
 /**
- * @brief Sprawdza warunki i ewentualnie aktywuje pompę automatycznie.
- * @param currentSoilMoisture Aktualna wilgotność gleby (%).
- * @param currentWaterLevel Aktualny poziom wody (0-5).
+ * @brief Checks conditions and activates pump automatically if needed
+ * @param currentSoilMoisture Current soil moisture (%)
+ * @param currentWaterLevel Current water level (0-5)
  */
 void pumpControlActivateIfNeeded(int currentSoilMoisture, int currentWaterLevel);
 
 /**
- * @brief Manualnie włącza pompę na podany czas (blokująco).
- * @param durationMillis Czas pracy w ms.
+ * @brief Manually turns on the pump for specified time (non-blocking)
+ * @param durationMillis Duration in ms
  */
 void pumpControlManualTurnOn(uint32_t durationMillis);
 
 /**
- * @brief Manualnie natychmiastowo wyłącza pompę.
+ * @brief Manually turns off the pump immediately
  */
 void pumpControlManualTurnOff();
 
 /**
- * @brief Sprawdza, czy pompa jest aktualnie włączona.
- * @return true jeśli pompa pracuje, false w przeciwnym razie.
+ * @brief Checks if pump is currently running
+ * @return true if pump is running, false otherwise
  */
 bool pumpControlIsRunning();
 
-void pumpControlUpdate(); // Nowa funkcja do regularnego wywoływania w loop()
+/**
+ * @brief Updates pump state, should be called regularly in loop()
+ */
+void pumpControlUpdate();
 
-#endif // PUMPCONTROL_H
+#endif // PUMP_CONTROL_H
