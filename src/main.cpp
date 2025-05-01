@@ -17,13 +17,14 @@
 #include "AlarmManager.h"
 #include <Preferences.h>
 #include "ButtonManager.h"
+#include "LedManager.h"
 
 // Wbudowana dioda LED
-#ifndef LED_BUILTIN
-#define LED_BUILTIN 2
-#endif
-#define WEBPORTAL_TIMEOUT 12
+const uint8_t DIODA_PIN = 22; //TO MOVE
+#define WEBPORTAL_TIMEOUT 12 //TO CHANGE
 #define WIFI_CONNECTION_TIMEOUT 10
+
+
 
 struct SensorData {
     int soilMoisture = -1;
@@ -39,11 +40,15 @@ struct SensorData {
 SensorData performMeasurement();
 void displayMeasurements(const SensorData& data);
 void print_wakeup_reason();
-
+void updateLedBasedOnState(); 
+void setMeasuringStatus(bool isActive);
+void setConnectingWifiStatus(bool isActive);
 
 
 // Czas ostatniego cyklu pomiarowego
 static int unsigned long lastMeasurementTime = 0;
+static bool _isMeasuring = false;
+static bool _isConnectingWifi = false;
 
 // --- Główna funkcja Setup ---
 void setup() {
@@ -55,12 +60,11 @@ void setup() {
 
     Wire.begin();
     delay(100);
-
+    
     configSetup(); // Wczytaj konfigurację
 
     // Inicjalizuj moduły
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, HIGH);
+    ledManagerSetup(DIODA_PIN, HIGH);
 
     soilSensorSetup();
     waterLevelSensorSetup();
@@ -70,12 +74,13 @@ void setup() {
     alarmManagerSetup();
     buttonSetup();
 
-    digitalWrite(LED_BUILTIN, LOW);
+    ledManagerBlink(100); // Mignięcie 100ms
 
     
     // --- ZAWSZE WYKONAJ PIERWSZY POMIAR ---
     Serial.println("\n--- Pierwszy pomiar/cykl po starcie/wybudzeniu ---");
-    g_latestSensorData = performMeasurement(); // Wywołaj funkcję pomiarową
+    g_latestSensorData = performMeasurement();
+
 
     // Aktualizuj stan alarmu na podstawie pierwszego pomiaru
     alarmManagerUpdate(g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage, g_latestSensorData.soilMoisture);
@@ -113,9 +118,7 @@ void setup() {
      String apName = "Flaura-Wifi-" + String((uint32_t)ESP.getEfuseMac(), HEX);
  
      Serial.println("Próba auto-połączenia z zapisaną siecią WiFi...");
-     // autoConnect próbuje połączyć się z zapisaną siecią (przez connectTimeout).
-     // JEŚLI się nie uda ORAZ timeout portalu jest > 0 (czyli po resecie/power-on), uruchomi portal konfiguracyjny.
-     // JEŚLI się nie uda ORAZ timeout portalu jest == 0 (czyli po deep sleep), POWINIEN zwrócić false bez uruchamiania portalu.
+     setConnectingWifiStatus(true);
      if (wm.autoConnect(apName.c_str())) {
          // Sukces - połączono z zapisaną siecią LUB skonfigurowano przez portal
          Serial.println("\nPołączono z WiFi!");
@@ -129,7 +132,7 @@ void setup() {
          Serial.println("Przechodzę w tryb OFFLINE.");
          connectSuccess = false;
      }
- 
+     setConnectingWifiStatus(false);
      // Dalsza logika zależna od connectSuccess
      if (connectSuccess) {
          Serial.println("Przechodzę do konfiguracji Blynk i synchronizacji czasu...");
@@ -165,7 +168,7 @@ void setup() {
         if (pumpControlIsRunning()) {
             Serial.println("Pompa pracuje - pozostaję w trybie aktywnym (przejście do loop).");
         } else {
-            digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
+            ledManagerTurnOff();
             Serial.println("Konfiguruję wybudzanie i przechodzę w Deep Sleep...");
             if (blynkIsConnected()) {
                 blynkDisconnect();
@@ -181,6 +184,7 @@ void setup() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // --- Główna pętla Loop ---
 void loop() {
+    ledManagerUpdate();
     pumpControlUpdate();
     // --- OBSŁUGA SIECI (jeśli jest połączenie WiFi) ---
     if (WiFi.status() == WL_CONNECTED) {
@@ -195,6 +199,7 @@ void loop() {
        blynkRun();
     } else if (!alarmManagerIsAlarmActive() && (!pumpControlIsRunning()))   {
         Serial.println("Brak aktywnego alarmu oraz połączenia z siecią - włączam tryb uśpienia");
+        ledManagerTurnOff();
         configSetContinuousMode(false);
     }
 
@@ -209,8 +214,7 @@ void loop() {
         if ((millis() - lastMeasurementTime > interval) || buttonWasPressed()) {
 
             // --- Krok 1: Odczytaj sensory (niezależnie od WiFi) ---
-            g_latestSensorData = performMeasurement(); // Wywołaj funkcję pomiarową
-
+            g_latestSensorData = performMeasurement();
             // Zaktualizuj ostatnie znane wartości (dla alarmu na końcu pętli)
             if (g_latestSensorData.soilMoisture >= 0) g_latestSensorData.soilMoisture = g_latestSensorData.soilMoisture;
             g_latestSensorData.waterLevel = g_latestSensorData.waterLevel;
@@ -242,7 +246,7 @@ void loop() {
         // --- Tryb Deep Sleep ---
         if (!pumpControlIsRunning() && !alarmManagerIsAlarmActive()) {
              Serial.println("[Loop] Pompa zakończyła pracę w trybie Deep Sleep, przechodzę do uśpienia...");
-             digitalWrite(LED_BUILTIN, HIGH); delay(50); digitalWrite(LED_BUILTIN, LOW);
+             ledManagerTurnOff();
              if (blynkIsConnected()){
                  blynkDisconnect();
              }
@@ -257,6 +261,7 @@ void loop() {
             pumpControlIsRunning(), alarmManagerIsAlarmActive());
         
     }
+    updateLedBasedOnState();
     delay(10);
 
 } // Koniec loop()
@@ -265,12 +270,16 @@ void loop() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 SensorData performMeasurement() {
-    Serial.println("Rozpoczynam odczyt sensorów...");
-    digitalWrite(LED_BUILTIN, HIGH); // Włącz LED na czas pomiaru
+    //Serial.println("Rozpoczynam odczyt sensorów...");
+    setMeasuringStatus(true);
 
     SensorData data; // Struktura na wyniki
 
     data.soilMoisture = soilSensorReadPercent();
+    // *** DEBUG: Dodaj ten log ***
+    Serial.printf("[Debug] soilSensorReadPercent() zwróciło: %d\n", data.soilMoisture);
+    // ***************************
+    data.waterLevel = waterLevelSensorReadLevel();
     data.waterLevel = waterLevelSensorReadLevel();
     data.batteryVoltage = batteryMonitorReadVoltage();
 
@@ -285,7 +294,7 @@ SensorData performMeasurement() {
         data.humidity = NAN;
     }
 
-    digitalWrite(LED_BUILTIN, LOW); // Wyłącz LED
+    setMeasuringStatus(false);
     Serial.println("Odczyt sensorów zakończony.");
     return data; // Zwróć strukturę z wynikami
 }
@@ -321,3 +330,34 @@ void print_wakeup_reason(){
       default : Serial.printf("Reset lub Power On (przyczyna nr %d)\n", wakeup_reason); break;
     }
   }
+
+  void setMeasuringStatus(bool isActive) {
+    _isMeasuring = isActive;
+    updateLedBasedOnState();
+    
+    if (isActive) {
+        Serial.println("[Status] Rozpoczęto pomiar");
+    }
+}
+
+void setConnectingWifiStatus(bool isActive) {
+    _isConnectingWifi = isActive;
+    updateLedBasedOnState();
+    
+    if (isActive) {
+        Serial.println("[Status] Rozpoczęto łączenie z WiFi");
+    } else {
+        Serial.println("[Status] Zakończono łączenie z WiFi");
+    }
+}
+
+// --- Funkcja zarządzająca stanem LED na podstawie flag ---
+void updateLedBasedOnState() {
+    if (_isMeasuring || _isConnectingWifi) {
+        ledManagerSetState(LED_ON); // Priorytet: Włączona podczas pomiaru/łączenia
+    } else if (alarmManagerIsAlarmActive()) {
+        ledManagerSetState(LED_BLINKING_FAST); // Migaj szybko, jeśli jest alarm
+    } else {
+        ledManagerSetState(LED_OFF); // W przeciwnym razie zgaś
+    }
+}
