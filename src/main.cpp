@@ -18,7 +18,13 @@
 #include <Preferences.h>
 #include "ButtonManager.h"
 
-// --- NOWOŚĆ: Struktura do przechowywania danych z pomiarów ---
+// Wbudowana dioda LED
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 2
+#endif
+#define WEBPORTAL_TIMEOUT 12
+#define WIFI_CONNECTION_TIMEOUT 10
+
 struct SensorData {
     int soilMoisture = -1;
     int waterLevel = -1;
@@ -34,12 +40,7 @@ SensorData performMeasurement();
 void displayMeasurements(const SensorData& data);
 void print_wakeup_reason();
 
-// Wbudowana dioda LED
-#ifndef LED_BUILTIN
-#define LED_BUILTIN 2
-#endif
-#define WEBPORTAL_TIMEOUT 120
-#define WIFI_CONNECTION_TIMEOUT 10
+
 
 // Czas ostatniego cyklu pomiarowego
 static int unsigned long lastMeasurementTime = 0;
@@ -48,7 +49,7 @@ static int unsigned long lastMeasurementTime = 0;
 void setup() {
     Serial.begin(115200);
     delay(100);
-    clearPreferencesData("flaura_cfg_1");
+    //clearPreferencesData("flaura_cfg_1");
     Serial.println("\n--- Flaura Smart Pot - Główny Start ---");
     print_wakeup_reason();
 
@@ -99,7 +100,7 @@ void setup() {
  
      WiFi.mode(WIFI_STA);
      WiFiManager wm; // Utwórz obiekt WiFiManager
-     //wm.resetSettings(); // Odkomentuj do testów resetowania ustawień WiFi
+     wm.resetSettings(); // Odkomentuj do testów resetowania ustawień WiFi
      wm.setConnectTimeout(WIFI_CONNECTION_TIMEOUT); // Czas próby połączenia z zapisaną siecią (sekundy)
      if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
          // Przyczyna: Reset lub Power-On
@@ -114,7 +115,7 @@ void setup() {
  
      wm.setWiFiAutoReconnect(true); // Włącz automatyczne ponowne łączenie w tle
  
-     // Nazwa sieci AP, która pojawi się (tylko po resecie/power-on), gdy urządzenie nie będzie mogło się połączyć
+     // Nazwa sieci AP, która pojawi się+ (tylko po resecie/power-on), gdy urządzenie nie będzie mogło się połączyć
      String apName = "Flaura-Wifi-" + String((uint32_t)ESP.getEfuseMac(), HEX);
  
      Serial.println("Próba auto-połączenia z zapisaną siecią WiFi...");
@@ -226,8 +227,6 @@ void loop() {
 
             // --- Krok 3: Wyślij dane do Blynk (TYLKO jeśli jest połączenie) ---
             if (WiFi.status() == WL_CONNECTED && blynkIsConnected()) {
-                 Serial.println("Wysyłanie danych do Blynk...");
-                 // Użyj danych z g_latestSensorData
                  blynkSendSensorData(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage,
                                     g_latestSensorData.temperature, g_latestSensorData.humidity,
                                     pumpControlIsRunning(), alarmManagerIsAlarmActive());
