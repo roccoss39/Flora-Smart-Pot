@@ -2,7 +2,8 @@
 #define BLYNKMANAGER_H
 
 #include <stdint.h>
-
+#include "secrets.h" // <-- WAŻNE: Dołącz NAJPIERW definicje/secrety
+#include <BlynkSimpleEsp32.h> 
 /**
  * @brief Konfiguruje dane autoryzacyjne Blynk.
  * Należy wywołać przed blynkConnect().

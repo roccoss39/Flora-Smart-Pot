@@ -39,7 +39,7 @@ void print_wakeup_reason();
 #define LED_BUILTIN 2
 #endif
 #define WEBPORTAL_TIMEOUT 120
-#define WIFI_CONNECTION_TIMEOUT 20
+#define WIFI_CONNECTION_TIMEOUT 10
 
 // Czas ostatniego cyklu pomiarowego
 static int unsigned long lastMeasurementTime = 0;

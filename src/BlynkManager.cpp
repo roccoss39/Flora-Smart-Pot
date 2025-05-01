@@ -193,6 +193,8 @@ BLYNK_CONNECTED() {
       Blynk.virtualWrite(BLYNK_VPIN_CONTINUOUS_MODE, configIsContinuousMode());
     }
 
+    uint8_t currentDutyCycle = configGetPumpDutyCycle(); // Pobierz zapisaną wartość 0-255
+    uint8_t percentageToSend = map(currentDutyCycle, 0, 255, 0, 100); // Przelicz na procenty
     // Aktualizuj wartości widgetów na podstawie bieżącej konfiguracji
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_DURATION, configGetPumpRunMillis());
     Blynk.virtualWrite(BLYNK_VPIN_SOIL_THRESHOLD, configGetSoilThresholdPercent());
@@ -208,7 +210,7 @@ BLYNK_CONNECTED() {
     Blynk.virtualWrite(BLYNK_VPIN_WATER_LEVEL_THRESHOLD, configGetWaterLevelThreshold());
     Blynk.virtualWrite(BLYNK_VPIN_CALIBRATE_SOIL_DRY, configGetSoilDryADC());
     Blynk.virtualWrite(BLYNK_VPIN_CALIBRATE_SOIL_WET, configGetSoilWetADC());
-    Blynk.virtualWrite(BLYNK_VPIN_PUMP_SPEED, configGetPumpDutyCycle());
+    Blynk.virtualWrite(BLYNK_VPIN_PUMP_SPEED, percentageToSend);
     Serial.println("[Blynk] Synchronizacja zakończona.");
 }
 
@@ -261,11 +263,20 @@ BLYNK_WRITE(BLYNK_VPIN_CALIBRATE_SOIL_WET) {
 }
 
 BLYNK_WRITE(BLYNK_VPIN_PUMP_SPEED) {
-  uint8_t dutyCycle = param.asInt();
-  // Walidacja (zgodnie z rozdzielczością LEDC - 8 bitów = 0-255)
-  if (dutyCycle < 0) dutyCycle = 0;
-  if (dutyCycle > 255) dutyCycle = 255; // Maksimum dla 8-bitowej rozdzielczości
+  // Odczytaj wartość z widgetu Blynk (zakładamy, że wysyła 0-100)
+  int percentage = param.asInt();
 
-  Serial.printf("[Blynk] Otrzymano nową moc pompy (Duty Cycle) na V%d: %d/255\n", BLYNK_VPIN_PUMP_SPEED, dutyCycle);
-  configSetPumpDutyCycle((uint8_t)dutyCycle); // Wywołaj setter z DeviceConfig
+  // Walidacja otrzymanej wartości procentowej
+  if (percentage < 0) percentage = 0;
+  if (percentage > 100) percentage = 100;
+
+  // --- Konwersja z 0-100% na 0-255 (dla 8-bit PWM) ---
+  // Użyjemy funkcji map() z Arduino
+  uint8_t dutyCycle = map(percentage, 0, 100, 0, 255);
+
+  // Logowanie dla diagnostyki
+  Serial.printf("[Blynk] Otrzymano moc pompy: %d%%. Konwertuję na Duty Cycle: %d/255\n", percentage, dutyCycle);
+
+  // Zapisz skonwertowaną wartość (0-255) używając settera
+  configSetPumpDutyCycle(dutyCycle);
 }
