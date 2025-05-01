@@ -94,4 +94,12 @@ void configSetSoilDryADC(int value);
  * @param value Odczyt ADC (0-4095).
  */
 void configSetSoilWetADC(int value);
+// --- NOWOŚĆ: Getter dla mocy pompy ---
+uint8_t configGetPumpDutyCycle(); // Zwraca wartość 0-255
+
+// ... (istniejące deklaracje funkcji configSet...) ...
+
+// --- NOWOŚĆ: Setter dla mocy pompy ---
+void configSetPumpDutyCycle(uint8_t duty); // Ustawia wartość 0-255
+
 #endif // DEVICECONFIG_H

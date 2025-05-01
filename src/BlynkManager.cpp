@@ -29,6 +29,7 @@
 #define BLYNK_VPIN_ALARM_SOUND_ENABLE V16 // Przełącznik (Switch)
 #define BLYNK_VPIN_CALIBRATE_SOIL_DRY V17 // Wartość ADC dla "sucho"
 #define BLYNK_VPIN_CALIBRATE_SOIL_WET V18 // Wartość ADC dla "mokro"
+#define BLYNK_VPIN_PUMP_SPEED        V19 
 #define BLYNK_VPIN_MEASUREMENT_HOUR V20 // Input/Widget
 #define BLYNK_VPIN_MEASUREMENT_MINUTE V21 // Input/Widget
 
@@ -179,6 +180,7 @@ BLYNK_CONNECTED() {
     Blynk.syncVirtual(BLYNK_VPIN_WATER_LEVEL_THRESHOLD);
     Blynk.syncVirtual(BLYNK_VPIN_CALIBRATE_SOIL_DRY);
     Blynk.syncVirtual(BLYNK_VPIN_CALIBRATE_SOIL_WET);
+    Blynk.syncVirtual(BLYNK_VPIN_PUMP_SPEED);
 
     if (!alarmManagerIsAlarmActive())
     {
@@ -206,6 +208,7 @@ BLYNK_CONNECTED() {
     Blynk.virtualWrite(BLYNK_VPIN_WATER_LEVEL_THRESHOLD, configGetWaterLevelThreshold());
     Blynk.virtualWrite(BLYNK_VPIN_CALIBRATE_SOIL_DRY, configGetSoilDryADC());
     Blynk.virtualWrite(BLYNK_VPIN_CALIBRATE_SOIL_WET, configGetSoilWetADC());
+    Blynk.virtualWrite(BLYNK_VPIN_PUMP_SPEED, configGetPumpDutyCycle());
     Serial.println("[Blynk] Synchronizacja zakończona.");
 }
 
@@ -255,4 +258,14 @@ BLYNK_WRITE(BLYNK_VPIN_CALIBRATE_SOIL_WET) {
 
   Serial.printf("[Blynk] Otrzymano nową wartość kalibracji 'mokro' (ADC) na V%d: %d\n", BLYNK_VPIN_CALIBRATE_SOIL_WET, adcValue);
   configSetSoilWetADC(adcValue); // Wywołaj setter z DeviceConfig
+}
+
+BLYNK_WRITE(BLYNK_VPIN_PUMP_SPEED) {
+  uint8_t dutyCycle = param.asInt();
+  // Walidacja (zgodnie z rozdzielczością LEDC - 8 bitów = 0-255)
+  if (dutyCycle < 0) dutyCycle = 0;
+  if (dutyCycle > 255) dutyCycle = 255; // Maksimum dla 8-bitowej rozdzielczości
+
+  Serial.printf("[Blynk] Otrzymano nową moc pompy (Duty Cycle) na V%d: %d/255\n", BLYNK_VPIN_PUMP_SPEED, dutyCycle);
+  configSetPumpDutyCycle((uint8_t)dutyCycle); // Wywołaj setter z DeviceConfig
 }

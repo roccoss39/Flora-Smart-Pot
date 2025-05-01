@@ -33,6 +33,7 @@ const char* PREF_ALARM_SND_EN = "almSndEn";
 const char* PREF_LOW_BAT_MV = "lowBatMv";
 const char* PREF_LOW_SOIL_PCT = "lowSoilPct";
 const char* PREF_BUTTON_PIN = "buttonPin";
+const char* PREF_PUMP_DUTY = "pumpDuty";
 
 // --- Domyślne wartości konfiguracji ---
 // Soil Sensor - Twoje wartości, z kontrolą VCC
@@ -72,6 +73,7 @@ const int DEFAULT_LOW_SOIL_PERCENT = 40; // Np. 20%
 
 const uint8_t DEFAULT_BUTTON_PIN = 32;
 
+const uint8_t DEFAULT_PUMP_DUTY = 255; // Domyślnie pełna moc
 // Zmienne statyczne
 static uint8_t soilSensorPin;
 static int soilAdcDry;
@@ -94,6 +96,7 @@ static uint8_t dhtPowerPin;
 static uint8_t buttonPin;
 static uint8_t  waterLevelGroundPin;
 static uint16_t waterLevelThreshold;
+static uint8_t pumpDutyCycle;
 
 // Zapisuje domyślne, jeśli brakuje klucza PREF_SLEEP_SEC
 void saveDefaultConfigurationIfNeeded() {
@@ -118,6 +121,7 @@ void saveDefaultConfigurationIfNeeded() {
         preferences.putInt(PREF_LOW_SOIL_PCT, DEFAULT_LOW_SOIL_PERCENT);
         preferences.putUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
         preferences.putUChar(PREF_BUTTON_PIN, DEFAULT_BUTTON_PIN);
+        preferences.putUChar(PREF_PUMP_DUTY, DEFAULT_PUMP_DUTY);
 
         if (!preferences.isKey(PREF_WL_GROUND_PIN)) {
             // tylko raz zapisujemy domyślne ustawienia
@@ -161,6 +165,7 @@ void configSetup() {
     lowSoilPercent = preferences.getInt(PREF_LOW_SOIL_PCT, DEFAULT_LOW_SOIL_PERCENT);
     dhtPowerPin = preferences.getUChar(PREF_DHT_PWR_PIN, DEFAULT_DHT_PWR_PIN);
     buttonPin = preferences.getUChar(PREF_BUTTON_PIN, DEFAULT_BUTTON_PIN);
+    pumpDutyCycle = preferences.getUChar(PREF_PUMP_DUTY, DEFAULT_PUMP_DUTY);
 
     preferences.end();
 
@@ -189,11 +194,13 @@ void configSetup() {
     Serial.printf("  Próg alarmu niskiej wilg. gleby: %d %%\n", lowSoilPercent);
     Serial.printf("  Pin zasilania DHT11: %d\n", dhtPowerPin);
     Serial.printf("  Pin przycisku (wybudzania EXT0): %d\n", buttonPin);
+    Serial.printf("  Moc pompy (Duty Cycle): %d/255\n", pumpDutyCycle);
 
     Serial.println("--------------------");
 }
 
 // Gettery
+uint8_t configGetPumpDutyCycle() { return pumpDutyCycle; }
 bool configIsContinuousMode() { return continuousMode; }
 uint8_t configGetSoilPin() { return soilSensorPin; }
 int configGetSoilDryADC() { return soilAdcDry; }
@@ -217,6 +224,19 @@ uint16_t configGetWaterLevelThreshold()            { return waterLevelThreshold;
 
 
 // --- IMPLEMENTACJA NOWYCH SETTERÓW ---
+
+void configSetPumpDutyCycle(uint8_t duty) {
+    // Walidacja nie jest ściśle potrzebna, bo uint8_t jest 0-255, ale dla pewności:
+    // if (duty > 255) duty = 255; // uint8_t i tak nie przekroczy 255
+
+    if (pumpDutyCycle != duty) { // Zapisz tylko jeśli wartość się zmieniła
+        pumpDutyCycle = duty; // Zaktualizuj wartość w RAM
+        preferences.begin(PREF_NAMESPACE, false); // Otwórz R/W
+        preferences.putUChar(PREF_PUMP_DUTY, pumpDutyCycle); // Zapisz nową wartość do Flash
+        preferences.end(); // Zamknij
+        Serial.printf("[Config] Zapisano nową moc pompy (Duty Cycle): %d/255\n", pumpDutyCycle);
+    }
+}
 void configSetWaterLevelGroundPin(uint8_t pin) {
     if (waterLevelGroundPin != pin) {
         waterLevelGroundPin = pin;
