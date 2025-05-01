@@ -2,8 +2,7 @@
 #define BLYNKMANAGER_H
 
 #include <stdint.h>
-#include "secrets.h" // <-- WAŻNE: Dołącz NAJPIERW definicje/secrety
-#include <BlynkSimpleEsp32.h> 
+
 /**
  * @brief Konfiguruje dane autoryzacyjne Blynk.
  * Należy wywołać przed blynkConnect().
@@ -43,7 +42,7 @@ void blynkDisconnect();
  * @brief Wysyła odczytane wartości sensorów do odpowiednich wirtualnych pinów Blynk.
  * Należy dostosować numery VPIN wewnątrz funkcji w pliku .cpp!
  */
-void blynkSendSensorData(int soil, int waterLvl, float batteryV, float temp, float humid, float tilt, bool tiltAlert, bool pumpStatus);
+void blynkSendSensorData(int soil, int waterLvl, float batteryV, float temp, float humid, bool pumpStatus, bool isAlarmCurrentlyActive);
 
 void blynkUpdatePumpStatus(bool isRunning);
 

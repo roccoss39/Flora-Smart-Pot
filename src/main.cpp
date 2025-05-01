@@ -155,8 +155,8 @@ void setup() {
         Serial.println("Wysyłanie pierwszych danych do Blynk...");
         // Użyj danych z g_latestSensorData
         blynkSendSensorData(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage,
-                             g_latestSensorData.temperature, g_latestSensorData.humidity,
-                             NAN, false, pumpControlIsRunning());
+            g_latestSensorData.temperature, g_latestSensorData.humidity,
+            pumpControlIsRunning(), alarmManagerIsAlarmActive());
     } else {
         Serial.println("Pomijam wysyłkę pierwszych danych - brak połączenia.");         
     }
@@ -229,8 +229,8 @@ void loop() {
                  Serial.println("Wysyłanie danych do Blynk...");
                  // Użyj danych z g_latestSensorData
                  blynkSendSensorData(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage,
-                                      g_latestSensorData.temperature, g_latestSensorData.humidity,
-                                      NAN, false, pumpControlIsRunning());
+                                    g_latestSensorData.temperature, g_latestSensorData.humidity,
+                                    pumpControlIsRunning(), alarmManagerIsAlarmActive());
             } else {
                  Serial.println("Pomijam wysyłkę do Blynk - brak połączenia.");
             }
@@ -256,7 +256,14 @@ void loop() {
              powerManagerGoToDeepSleep();
         }
     }
-    alarmManagerUpdate(g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage, g_latestSensorData.soilMoisture);
+    bool alarmStateChanged = alarmManagerUpdate(g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage, g_latestSensorData.soilMoisture);
+    
+    if (alarmStateChanged) {
+        blynkSendSensorData(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel, g_latestSensorData.batteryVoltage,
+            g_latestSensorData.temperature, g_latestSensorData.humidity,
+            pumpControlIsRunning(), alarmManagerIsAlarmActive());
+        
+    }
     delay(10);
 
 } // Koniec loop()

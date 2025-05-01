@@ -36,9 +36,10 @@ void alarmManagerSetup() {
     buzzerOn = false;   // Zresetuj stan buzzera
 }
 
-void alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture) {
+bool alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture) {
+    bool stateChanged = false; // Flaga sygnalizująca zmianę stanu w tym wywołaniu
     if (buzzerPin == 255) { // Jeśli pin nie jest skonfigurowany, nic nie rób
-        return;
+        return false;;
     }
 
         // Wypisanie wartości argumentów
@@ -83,6 +84,13 @@ void alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture) 
     // Zaktualizuj ogólny stan alarmu
     bool previousAlarmState = isAlarmActive;
     isAlarmActive = lowWaterAlarm || lowBatteryAlarm || lowSoilAlarm;
+
+    if (isAlarmActive != previousAlarmState) {
+        stateChanged = true; // Ustaw flagę zmiany stanu
+        Serial.printf("[Alarm] Wykryto zmianę stanu alarmu: %s -> %s (Sygnalizuję zmianę)\n",
+                      previousAlarmState ? "AKTYWNY" : "NIEAKTYWNY",
+                      isAlarmActive ? "AKTYWNY" : "NIEAKTYWNY");
+    }
 
     // --- Logika sterowania buzzerem ---
     bool soundEnabled = configIsAlarmSoundEnabled(); // <<< NOWOŚĆ: Sprawdź, czy dźwięk jest włączony
@@ -164,6 +172,7 @@ void alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture) 
             //Serial.println("[Alarm] Dezaktywacja - buzzer OFF.");
         }
     }
+    return stateChanged; // Zwróć informację o zmianie stanu
 }
 
 // Zwraca ogólny stan alarmu (czy warunki są spełnione), niezależnie od dźwięku

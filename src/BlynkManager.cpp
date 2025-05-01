@@ -78,30 +78,24 @@ void blynkDisconnect() {
      }
 }
 
-void blynkSendSensorData(int soil, int waterLvl, float batteryV, float temp, float humid, float tilt, bool tiltAlert, bool pumpStatus) {
+void blynkSendSensorData(int soil, int waterLvl, float batteryV, float temp, float humid, bool pumpStatus, bool isAlarmCurrentlyActive) {
     if (!Blynk.connected()) {
-        //Serial.println("Blynk nie połączony, pomijam wysyłanie danych.");
+        Serial.println("Blynk nie połączony, pomijam wysyłanie danych.");
         return;
     }
 
-    //Serial.println("Wysyłanie danych do Blynk...");
+    Serial.println("Wysyłanie danych do Blynk...");
 
     if (soil >= 0) Blynk.virtualWrite(BLYNK_VPIN_SOIL, soil);
     Blynk.virtualWrite(BLYNK_VPIN_WATER_LEVEL, waterLvl);
     if (batteryV > 0) Blynk.virtualWrite(BLYNK_VPIN_BATTERY, batteryV);
     if (!isnan(temp)) Blynk.virtualWrite(BLYNK_VPIN_TEMPERATURE, temp);
     if (!isnan(humid)) Blynk.virtualWrite(BLYNK_VPIN_HUMIDITY, humid);
-    // Te linie są zachowane, ale main.cpp wysyła NAN i false
-    if (!isnan(tilt)) Blynk.virtualWrite(BLYNK_VPIN_TILT_ANGLE, tilt);
-    Blynk.virtualWrite(BLYNK_VPIN_TILT_ALERT, tiltAlert ? 1 : 0);
-    // ---
+
     Blynk.virtualWrite(BLYNK_VPIN_PUMP_STATUS, pumpStatus ? 1 : 0);
+    Blynk.virtualWrite(BLYNK_VPIN_ALARM_STATUS, isAlarmCurrentlyActive ? 1 : 0);
 
-    // <<< NOWOŚĆ: Wysyłanie ogólnego stanu alarmu >>>
-    bool isAlarm = alarmManagerIsAlarmActive(); // Pobierz aktualny stan alarmu
-    Blynk.virtualWrite(BLYNK_VPIN_ALARM_STATUS, isAlarm ? 1 : 0); // Wyślij 1 (ON) jeśli alarm jest aktywny, 0 (OFF) w przeciwnym razie
-
-    //Serial.println("Dane wysłane.");
+    Serial.println("Dane wysłane.");
 }
 
 // --- Handlery BLYNK_WRITE ---

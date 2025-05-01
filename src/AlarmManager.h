@@ -13,7 +13,7 @@ void alarmManagerSetup();
  * @param batteryVoltage Aktualne napięcie baterii (V).
  * @param soilMoisture Aktualna wilgotność gleby (%).
  */
-void alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture);
+bool alarmManagerUpdate(int waterLevel, float batteryVoltage, int soilMoisture);
 
 bool alarmManagerIsAlarmActive(); // <-- Dodaj tę deklarację
 
