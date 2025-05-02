@@ -44,7 +44,7 @@ int  configGetMeasurementMinute();
 uint32_t configGetBlynkSendIntervalSec();
 /** Czas uśpienia po zakończeniu cyklu (w sekundach) */
 uint32_t configGetSleepSeconds();
-
+uint8_t configGetLedPin();
 
 // -----------------------------------------------------------------------------
 // Gettery – czujnik wilgotności gleby

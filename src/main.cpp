@@ -31,7 +31,7 @@
  #include <Preferences.h>
  
  // Stałe konfiguracyjne
- constexpr uint8_t LED_PIN = 22;
+
  constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 1;
  constexpr uint8_t WIFI_CONNECTION_TIMEOUT_SEC = 10;
  constexpr uint16_t BLYNK_RECONNECT_INTERVAL_MS = 15000;
@@ -82,7 +82,7 @@
  void setup() {
      Serial.begin(115200);
      delay(100);
-     
+     clearPreferencesData("flaura_cfg_1");
      Serial.println(F("\n--- Flaura Smart Pot - Główny Start ---"));
      print_wakeup_reason();
  
@@ -92,9 +92,9 @@
      
      // Wczytanie konfiguracji
      configSetup();
- 
+
      // Inicjalizacja modułów
-     ledManagerSetup(LED_PIN, HIGH);
+     ledManagerSetup(configGetLedPin(), HIGH);
      soilSensorSetup();
      waterLevelSensorSetup();
      pumpControlSetup();
@@ -282,7 +282,7 @@
          connectSuccess = true;
          
          // Konfiguracja Blynk
-         blynkConfigure(BLYNK_AUTH_TOKEN, BLYNK_TEMPLATE_ID, BLYNK_DEVICE_NAME);
+         blynkConfigure(BLYNK_AUTH_TOKEN, BLYNK_TEMPLATE_ID, BLYNK_TEMPLATE_NAME);
          
          if (!blynkConnect()) {
              Serial.println(F("OSTRZEŻENIE: Nie udało się połączyć z Blynk mimo połączenia WiFi."));
