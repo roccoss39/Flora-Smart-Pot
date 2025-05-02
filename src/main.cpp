@@ -32,7 +32,7 @@
  
  // Stałe konfiguracyjne
 
- constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 1;
+ constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 120;
  constexpr uint8_t WIFI_CONNECTION_TIMEOUT_SEC = 10;
  constexpr uint16_t BLYNK_RECONNECT_INTERVAL_MS = 15000;
  
@@ -82,7 +82,7 @@
  void setup() {
      Serial.begin(115200);
      delay(100);
-     clearPreferencesData("flaura_cfg_1");
+     //clearPreferencesData("flaura_cfg_1");
      Serial.println(F("\n--- Flaura Smart Pot - Główny Start ---"));
      print_wakeup_reason();
  
