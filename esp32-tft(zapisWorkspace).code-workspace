@@ -1,0 +1,25 @@
+{
+	"folders": [
+		{
+			"path": "../esp32-tft"
+		},
+		{
+			"name": "Flora",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"array": "cpp",
+			"deque": "cpp",
+			"string": "cpp",
+			"unordered_map": "cpp",
+			"unordered_set": "cpp",
+			"vector": "cpp",
+			"string_view": "cpp",
+			"initializer_list": "cpp",
+			"istream": "cpp",
+			"ostream": "cpp"
+		}
+	}
+}
