@@ -4,20 +4,20 @@
 #include <stdint.h>
 
 /**
- * @brief Inicjalizuje moduł monitorowania baterii.
+ * @brief Initializes battery monitoring module.
  */
 void batteryMonitorSetup();
 
 /**
- * @brief Odczytuje i zwraca aktualne napięcie baterii.
- * Uwzględnia dzielnik napięcia.
- * @return float Zmierzone napięcie baterii w Woltach (V).
+ * @brief Reads and returns current battery voltage.
+ * Takes voltage divider into account.
+ * @return float Measured battery voltage in Volts (V).
  */
 float batteryMonitorReadVoltage();
 
 /**
- * @brief Odczytuje surową wartość z przetwornika ADC.
- * @return int Wartość ADC (0-4095).
+ * @brief Reads raw value from ADC converter.
+ * @return int ADC value (0-4095).
  */
 int batteryMonitorReadRawADC();
 

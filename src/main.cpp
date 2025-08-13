@@ -1,11 +1,11 @@
 /**
  * @file main.cpp
- * @brief Główny plik programu Flaura Smart Pot
+ * @brief Main program file for Flora Smart Pot
  * @version 1.0
  * @date 2025-05-01
  * 
- * Program kontrolujący inteligentną doniczkę z funkcjami monitorowania wilgotności,
- * zarządzania nawadnianiem i komunikacją z chmurą Blynk.
+ * Program controlling smart plant pot with moisture monitoring,
+ * irrigation management and Blynk cloud communication.
  */
 
  #include <Arduino.h>
@@ -15,9 +15,9 @@
  #include <WiFi.h>
  #include <WiFiManager.h>
  
- // Moduły systemowe
+ // System modules
  #include "DeviceConfig.h"
- #include "secrets.h"  // Zawiera BLYNK_AUTH_TOKEN
+ #include "secrets.h"  // Contains BLYNK_AUTH_TOKEN
  #include "BlynkManager.h"
  #include "SoilSensor.h"
  #include "WaterLevelSensor.h"
@@ -30,7 +30,7 @@
  #include "LedManager.h"
  #include <Preferences.h>
  
- // Stałe konfiguracyjne
+ // Configuration constants
 
  constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 120;
  constexpr uint8_t WIFI_CONNECTION_TIMEOUT_SEC = 10;
@@ -38,7 +38,7 @@
  
  /**
   * @struct SensorData
-  * @brief Struktura przechowująca dane ze wszystkich sensorów
+  * @brief Structure storing data from all sensors
   */
  struct SensorData {
      int soilMoisture = -1;
@@ -49,15 +49,15 @@
      bool dhtOk = false;
      
      /**
-      * @brief Sprawdza czy dane są prawidłowe
-      * @return true jeśli podstawowe dane są dostępne
+      * @brief Checks if data is valid
+      * @return true if basic data is available
       */
      bool isValid() const {
          return soilMoisture >= 0 && waterLevel >= 0 && batteryVoltage > 0;
      }
  };
  
- // Lokalne zmienne statyczne
+ // Local static variables
  namespace {
      SensorData g_latestSensorData;
      unsigned long g_lastMeasurementTime = 0;
@@ -66,7 +66,7 @@
      bool g_isConnectingWifi = false;
  }
  
- // Deklaracje funkcji
+ // Function declarations
  SensorData performMeasurement();
  void displayMeasurements(const SensorData& data);
  void print_wakeup_reason();
@@ -77,23 +77,23 @@
  void setConnectingWifiStatus(bool isActive);
  
  /**
-  * @brief Konfiguracja urządzenia przy starcie
+  * @brief Device configuration at startup
   */
  void setup() {
      Serial.begin(115200);
      delay(100);
      //clearPreferencesData("flaura_cfg_1");
-     Serial.println(F("\n--- Flaura Smart Pot - Główny Start ---"));
+     Serial.println(F("\n--- Flora Smart Pot - Main Start ---"));
      print_wakeup_reason();
  
-     // Inicjalizacja I2C
+     // I2C initialization
      Wire.begin();
      delay(100);
      
-     // Wczytanie konfiguracji
+     // Load configuration
      configSetup();
 
-     // Inicjalizacja modułów
+     // Module initialization
      ledManagerSetup(configGetLedPin(), HIGH);
      soilSensorSetup();
      waterLevelSensorSetup();
@@ -120,13 +120,13 @@
          Serial.println(F("[SETUP] Wykryto aktywny alarm!"));
      }
  
-     // Wyświetlenie wyników pomiaru
+     // Display measurement results
      displayMeasurements(g_latestSensorData);
  
      // Konfiguracja sieci WiFi
      bool wifiConnected = setupWiFiConnection();
      
-     // Operacje po próbie połączenia WiFi
+     // Operations after WiFi connection attempt
      if (wifiConnected && blynkIsConnected()) {
          Serial.println(F("Wysyłanie pierwszych danych do Blynk..."));
          blynkSendSensorData(
@@ -147,7 +147,7 @@
      // Kontrola pompy na podstawie pierwszego pomiaru
      pumpControlActivateIfNeeded(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel);
  
-     // Decyzja o trybie pracy (aktywny/uśpienie)
+     // Decision about operation mode (active/sleep)
      const bool shouldSleep = !configIsContinuousMode() && 
                              !alarmManagerIsAlarmActive() && 
                              !pumpControlIsRunning();
@@ -171,16 +171,16 @@
  }
  
  /**
-  * @brief Główna pętla programu
+  * @brief Main program loop
   */
  void loop() {
-     // Aktualizacja podstawowych komponentów
+     // Update basic components
      ledManagerUpdate();
      pumpControlUpdate();
      
-     // Obsługa sieci
+     // Network handling
      if (WiFi.status() == WL_CONNECTED) {
-         // Próba ponownego połączenia z Blynk jeśli rozłączony
+         // Attempt to reconnect to Blynk if disconnected
          if (!blynkIsConnected()) {
              unsigned long currentTime = millis();
              if (currentTime - g_lastBlynkReconnectAttempt > BLYNK_RECONNECT_INTERVAL_MS) {
@@ -196,17 +196,17 @@
          configSetContinuousMode(false);
      }
  
-     // Obsługa cykli pomiarowych w trybie ciągłym
+     // Handle measurement cycles in continuous mode
      if (configIsContinuousMode()) {
          uint32_t interval = configGetBlynkSendIntervalSec() * 1000;
-         if (interval == 0) interval = 60000;  // Domyślny interwał 60s
+         if (interval == 0) interval = 60000;  // Default interval 60s
  
-         // Sprawdzenie czy nadszedł czas na pomiar
+         // Check if it's time for measurement
          if ((millis() - g_lastMeasurementTime > interval) || buttonWasPressed()) {
              handleMeasurementCycle();
          }
      } else {
-         // Obsługa trybu Deep Sleep
+         // Handle Deep Sleep mode
          if (!pumpControlIsRunning() && !alarmManagerIsAlarmActive()) {
              Serial.println(F("[Loop] Pompa zakończyła pracę w trybie Deep Sleep, przechodzę do uśpienia..."));
              ledManagerTurnOff();
@@ -226,7 +226,7 @@
          g_latestSensorData.soilMoisture
      );
      
-     // Wysyłka danych do Blynk przy zmianie stanu alarmu
+     // Send data to Blynk when alarm state changes
      if (alarmStateChanged && blynkIsConnected()) {
          blynkSendSensorData(
              g_latestSensorData.soilMoisture, 
@@ -240,7 +240,7 @@
      }
      
      updateLedBasedOnState();
-     delay(10);  // Małe opóźnienie dla stabilności pętli
+     delay(10);  // Small delay for loop stability
  }
  
  /**
@@ -304,13 +304,13 @@
   * @brief Wykonanie pełnego cyklu pomiarowego
   */
  void handleMeasurementCycle() {
-     // Odczyt sensorów
+     // Read sensors
      g_latestSensorData = performMeasurement();
      
-     // Wyświetlenie wyników
+     // Display results
      displayMeasurements(g_latestSensorData);
  
-     // Wysyłka danych do Blynk
+     // Send data to Blynk
      if (WiFi.status() == WL_CONNECTED && blynkIsConnected()) {
          blynkSendSensorData(
              g_latestSensorData.soilMoisture, 
@@ -344,16 +344,16 @@
  
      SensorData data;
  
-     // Pomiar wilgotności gleby
+     // Soil moisture measurement
      data.soilMoisture = soilSensorReadPercent();
      
      // Pomiar poziomu wody
      data.waterLevel = waterLevelSensorReadLevel();
      
-     // Pomiar napięcia baterii
+     // Battery voltage measurement
      data.batteryVoltage = batteryMonitorReadVoltage();
  
-     // Pomiar temperatury i wilgotności powietrza
+     // Air temperature and humidity measurement
      float tempDHT, humDHT;
      data.dhtOk = environmentSensorRead(tempDHT, humDHT);
      
@@ -381,7 +381,7 @@
      // Informacja o trybie pracy
      Serial.printf("  Tryb ciągły: %s (false = Deep Sleep)\n", configIsContinuousMode() ? "TAK" : "NIE");
      
-     // Wyświetlenie danych sensorów
+     // Display sensor data
      if (data.soilMoisture >= 0) {
          Serial.printf("  Wilgotność gleby: %d %%\n", data.soilMoisture);
      } else {
@@ -469,7 +469,7 @@
   */
  void updateLedBasedOnState() {
      if (g_isMeasuring || g_isConnectingWifi) {
-         ledManagerSetState(LED_ON);  // Priorytet: pomiar/łączenie
+         ledManagerSetState(LED_ON);  // Priority: measurement/connecting
      } else if (alarmManagerIsAlarmActive()) {
          ledManagerSetState(LED_BLINKING_FAST);  // Alarm
      } else {

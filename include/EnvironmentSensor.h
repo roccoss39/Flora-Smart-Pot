@@ -4,16 +4,16 @@
 #include <stdint.h>
 
 /**
- * @brief Inicjalizuje czujnik środowiskowy (DHT11).
+ * @brief Initializes environmental sensor (DHT11).
  */
 void environmentSensorSetup();
 
 /**
- * @brief Odczytuje temperaturę i wilgotność z czujnika DHT11.
+ * @brief Reads temperature and humidity from DHT11 sensor.
  *
- * @param temperature Referencja do zmiennej, gdzie zostanie zapisana temperatura (°C).
- * @param humidity Referencja do zmiennej, gdzie zostanie zapisana wilgotność (%RH).
- * @return true jeśli odczyt był poprawny, false w przypadku błędu.
+ * @param temperature Reference to variable where temperature will be stored (°C).
+ * @param humidity Reference to variable where humidity will be stored (%RH).
+ * @return true if reading was successful, false in case of error.
  */
 bool environmentSensorRead(float &temperature, float &humidity);
 
