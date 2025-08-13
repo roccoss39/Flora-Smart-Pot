@@ -1,0 +1,22 @@
+# PlatformIO Libraries
+# These libraries are automatically managed by platformio.ini
+
+# Core ESP32 Libraries (built-in)
+# - Wire (I2C communication)
+# - WiFi (WiFi connectivity)
+# - Preferences (NVS storage)
+
+# External Libraries (defined in platformio.ini)
+# - DHT sensor library @ ^1.4.6 (Adafruit DHT11/DHT22 support)
+# - Adafruit Unified Sensor @ ^1.1.14 (Sensor abstraction layer)
+# - Blynk @ ^1.3.2 (Cloud connectivity)
+# - WiFiManager @ ^2.0.16-rc2 (WiFi configuration portal)
+
+# Development Tools
+# - PlatformIO Core >= 6.0.0
+# - ESP32 Platform >= 6.0.0
+
+# Optional Tools for Development
+# - Git (version control)
+# - Visual Studio Code (recommended IDE)
+# - PlatformIO IDE extension

@@ -1,3 +1,4 @@
+/*
 #ifndef MOTION_SENSOR_H
 #define MOTION_SENSOR_H
 
@@ -91,3 +92,4 @@ private:
 };
 
 #endif // MOTION_SENSOR_H
+*/

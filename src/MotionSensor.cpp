@@ -1,3 +1,4 @@
+/*
 #include "MotionSensor.h"
 
 // Konstruktor
@@ -180,3 +181,4 @@ uint8_t MotionSensor::readRegister(uint8_t reg) {
     return 0xFF; // Błąd odczytu
   }
 }
+  */

@@ -1,0 +1,96 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Custom for Visual Studio
+*.cs     diff=csharp
+
+# Standard to msysgit
+*.doc	 diff=astextplain
+*.DOC	 diff=astextplain
+*.docx diff=astextplain
+*.DOCX diff=astextplain
+*.dot  diff=astextplain
+*.DOT  diff=astextplain
+*.pdf  diff=astextplain
+*.PDF	 diff=astextplain
+*.rtf	 diff=astextplain
+*.RTF	 diff=astextplain
+
+# C/C++ files
+*.c text
+*.cc text
+*.cxx text
+*.cpp text
+*.c++ text
+*.hpp text
+*.h text
+*.h++ text
+*.hh text
+
+# Arduino files
+*.ino text
+
+# Makefiles
+Makefile text
+makefile text
+
+# Configuration files
+*.ini text
+*.cfg text
+*.conf text
+*.config text
+
+# Documentation
+*.md text
+*.txt text
+*.rst text
+
+# Scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Serialization
+*.json text
+*.toml text
+*.xml text
+*.yaml text
+*.yml text
+
+# Archives
+*.7z binary
+*.gz binary
+*.tar binary
+*.zip binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+
+# Fonts
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
+
+# Executables
+*.exe binary
+*.out binary
+*.app binary
+
+# Libraries
+*.so binary
+*.a binary
+*.lib binary
+*.dll binary
+
+# PlatformIO
+*.bin binary
+*.elf binary
+*.hex binary

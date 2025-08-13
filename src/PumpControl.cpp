@@ -1,92 +1,150 @@
+// PumpControl.cpp
 #include "PumpControl.h"
 #include "DeviceConfig.h"
 #include <Arduino.h>
+#include "BlynkManager.h"
 
+// LEDC (PWM) configuration
+const int PUMP_LEDC_CHANNEL = 0;    // LEDC channel (0-15)
+const int PUMP_LEDC_FREQ = 5000;    // PWM frequency in Hz (5kHz)
+const int PUMP_LEDC_RESOLUTION = 8; // PWM resolution (8 bits = values 0-255)
+
+// Static variables
 static uint8_t pumpPin;
-static uint32_t pumpRunMillisDefault;
-static int soilThreshold;
 static bool isPumpOn = false;
+static unsigned long pumpStartTime = 0;
+static uint32_t pumpTargetDuration = 0;
 
 void pumpControlSetup() {
     pumpPin = configGetPumpPin();
-    pumpRunMillisDefault = configGetPumpRunMillis();
-    soilThreshold = configGetSoilThresholdPercent();
 
-    if (pumpPin != 255) { // Używamy 255 jako wskaźnik błędu dla uint8_t
-        pinMode(pumpPin, OUTPUT);
-        digitalWrite(pumpPin, LOW);
+    if (pumpPin != 255) {
+        // Configure LEDC channel
+        ledcSetup(PUMP_LEDC_CHANNEL, PUMP_LEDC_FREQ, PUMP_LEDC_RESOLUTION);
+        // Assign GPIO pin to configured LEDC channel
+        ledcAttachPin(pumpPin, PUMP_LEDC_CHANNEL);
+        // Ensure pump is off at startup (duty cycle = 0)
+        ledcWrite(PUMP_LEDC_CHANNEL, 0);
         isPumpOn = false;
-        Serial.printf("  [Pompa] Skonfigurowano pin sterujący: %d (domyślny czas: %d ms, próg: %d%%)\n", pumpPin, pumpRunMillisDefault, soilThreshold);
+
+        // Log configuration info
+        Serial.printf("  [Pump] Configured PWM control pin: %d (LEDC Channel: %d, Freq: %d Hz, Res: %d bit)\n",
+                      pumpPin, PUMP_LEDC_CHANNEL, PUMP_LEDC_FREQ, PUMP_LEDC_RESOLUTION);
+
+        // Log other parameters
+        uint8_t initialDuty = configGetPumpDutyCycle();
+        uint32_t initialPumpMillis = configGetPumpRunMillis();
+        int initialSoilThreshold = configGetSoilThresholdPercent();
+        Serial.printf("  [Pump] Initial power (Duty Cycle): %d/255, Duration: %u ms, Threshold: %d%%\n", 
+                      initialDuty, initialPumpMillis, initialSoilThreshold);
+
     } else {
-        Serial.println("  [Pompa] BŁĄD: Nie skonfigurowano poprawnie pinu pompy!");
+        Serial.println("  [Pump] ERROR: Pump pin not properly configured in DeviceConfig!");
     }
 }
 
 void pumpControlActivateIfNeeded(int currentSoilMoisture, int currentWaterLevel) {
-    Serial.println("--- Automatyczna kontrola pompy ---");
+    Serial.println("--- Automatic pump control ---");
 
+    // Early returns for invalid conditions
     if (isPumpOn) {
-        Serial.println("  [Pompa] Pompa jest już włączona (manualnie?). Pomijam automatykę.");
+        Serial.println("  [Pump] Pump already running.");
         return;
     }
+    
     if (pumpPin == 255) {
-        Serial.println("  [Pompa] Błąd: Pin pompy nieskonfigurowany.");
+        Serial.println("  [Pump] ERROR: Pump pin not configured.");
         return;
     }
+    
     if (currentWaterLevel <= 0) {
-        Serial.println("  [Pompa] Poziom wody = 0. Pompa nie zostanie uruchomiona.");
+        Serial.println("  [Pump] ERROR: No water detected, cannot run pump.");
+        return;
+    }
+    
+    if (currentSoilMoisture < 0) {
+        Serial.println("  [Pump] ERROR: Invalid soil moisture reading.");
         return;
     }
 
-    Serial.printf("  [Pompa] Wilgotność: %d%%, Próg: %d%%\n", currentSoilMoisture, soilThreshold);
-    if (currentSoilMoisture < soilThreshold && currentSoilMoisture >= 0) {
-        Serial.printf("  [Pompa] Niska wilgotność. Uruchamiam pompę automatycznie na %d ms...\n", pumpRunMillisDefault);
-        digitalWrite(pumpPin, HIGH);
+    int currentSoilThreshold = configGetSoilThresholdPercent();
+    Serial.printf("  [Pump] Moisture: %d%%, Current threshold: %d%%\n", 
+                 currentSoilMoisture, currentSoilThreshold);
+
+    if (currentSoilMoisture < currentSoilThreshold) {
+        uint32_t currentPumpRunMillis = configGetPumpRunMillis();
+        uint8_t currentDutyCycle = configGetPumpDutyCycle();
+
+        Serial.printf("  [Pump] Low moisture. Starting pump automatically for %u ms at power %d/255...\n", 
+                     currentPumpRunMillis, currentDutyCycle);
+
+        // Turn on pump using PWM
+        ledcWrite(PUMP_LEDC_CHANNEL, currentDutyCycle);
         isPumpOn = true;
-        delay(pumpRunMillisDefault);
-        digitalWrite(pumpPin, LOW);
-        isPumpOn = false;
-        Serial.println("  [Pompa] Pompa zatrzymana (automat).");
-    } else if (currentSoilMoisture < 0) {
-         Serial.println("  [Pompa] Błąd odczytu wilgotności gleby. Pompa nieaktywna.");
+        pumpStartTime = millis();
+        pumpTargetDuration = currentPumpRunMillis;
+        blynkUpdatePumpStatus(isPumpOn);
+        Serial.println("  [Pump] Pump started (auto).");
     } else {
-        Serial.println("  [Pompa] Wilgotność gleby OK.");
+        Serial.println("  [Pump] Soil moisture OK.");
     }
-     Serial.println("---------------------------------");
+    Serial.println("---------------------------------");
 }
 
 void pumpControlManualTurnOn(uint32_t durationMillis) {
-     if (pumpPin == 255) {
-        Serial.println("  [Pompa] Błąd: Pin pompy nieskonfigurowany. Nie można włączyć manualnie.");
+    // Check valid conditions
+    if (pumpPin == 255) {
+        Serial.println("  [Pump] ERROR: Pump pin not configured.");
         return;
-     }
-     if (isPumpOn) {
-         Serial.println("  [Pompa] Pompa już pracuje.");
-         return;
-     }
-     Serial.printf("  [Pompa] Uruchamiam pompę manualnie na %d ms...\n", durationMillis);
-     digitalWrite(pumpPin, HIGH);
-     isPumpOn = true;
-     delay(durationMillis);
-     digitalWrite(pumpPin, LOW);
-     isPumpOn = false;
-     Serial.println("  [Pompa] Pompa zatrzymana (manual).");
+    }
+    
+    if (isPumpOn) {
+        Serial.println("  [Pump] Pump already running.");
+        return;
+    }
+
+    uint8_t currentDutyCycle = configGetPumpDutyCycle();
+    Serial.printf("  [Pump] Starting pump manually for %u ms at power %d/255...\n", 
+                 durationMillis, currentDutyCycle);
+
+    // Turn on pump using PWM
+    ledcWrite(PUMP_LEDC_CHANNEL, currentDutyCycle);
+    isPumpOn = true;
+    pumpStartTime = millis();
+    pumpTargetDuration = durationMillis;
+    blynkUpdatePumpStatus(isPumpOn);
 }
 
 void pumpControlManualTurnOff() {
     if (pumpPin == 255) {
-        Serial.println("  [Pompa] Błąd: Pin pompy nieskonfigurowany.");
+        Serial.println("  [Pump] ERROR: Pump pin not configured.");
         return;
-     }
+    }
+
     if (isPumpOn) {
-        Serial.println("  [Pompa] Manualne natychmiastowe wyłączenie pompy...");
-        digitalWrite(pumpPin, LOW);
+        Serial.println("  [Pump] Manual immediate pump shutdown...");
+        // Turn off pump using PWM (duty cycle = 0)
+        ledcWrite(PUMP_LEDC_CHANNEL, 0);
         isPumpOn = false;
+        pumpTargetDuration = 0;
+        blynkUpdatePumpStatus(isPumpOn);
     } else {
-         Serial.println("  [Pompa] Pompa już jest wyłączona.");
+        Serial.println("  [Pump] Pump is already off.");
     }
 }
 
 bool pumpControlIsRunning() {
     return isPumpOn;
+}
+
+void pumpControlUpdate() {
+    if (isPumpOn && (millis() - pumpStartTime >= pumpTargetDuration)) {
+        Serial.printf("  [Pump] Run time (%u ms) elapsed. Turning off pump.\n", pumpTargetDuration);
+        // Turn off pump using PWM (duty cycle = 0)
+        ledcWrite(PUMP_LEDC_CHANNEL, 0);
+        isPumpOn = false;
+        pumpTargetDuration = 0;
+        blynkUpdatePumpStatus(isPumpOn);
+        Serial.println("  [Pump] Pump stopped (auto-off after timeout).");
+    }
 }
