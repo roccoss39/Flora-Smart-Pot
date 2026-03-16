@@ -4,48 +4,76 @@
 
 static uint8_t adcPin;
 
-// Parametry dzielnika napięcia (zgodnie ze schematem Flaura)
-const float R1_VALUE = 99700.0; // Rezystor do GND
-const float R4_VALUE = 33020.0;  // Rezystor do V_BAT
-// Współczynnik, przez który mnożymy napięcie zmierzone na pinie ADC, aby dostać V_BAT
-const float VOLTAGE_MULTIPLIER = (R1_VALUE + R4_VALUE) / R1_VALUE; // ≈ 1.33
+// =============================================================
+//  LOLIN D32 – wbudowany dzielnik napięcia na GPIO35 (_VBAT)
+//  Płytka ma na PCB dwa rezystory 100kΩ tworzące dzielnik 1:2.
+//  NIE dodawaj zewnętrznych rezystorów – są już na płytce!
+//
+//  Schemat wbudowanego dzielnika:
+//    LiPo (+) ──── 100kΩ ──── GPIO35 ──── 100kΩ ──── GND
+//
+//  Mnożnik = (100k + 100k) / 100k = 2.0
+//  Przykład: ADC czyta 2.05V → V_BAT = 2.05 × 2.0 = 4.10V
+// =============================================================
+const float VOLTAGE_MULTIPLIER = 2.0f;
 
-// Napięcie referencyjne ADC i rozdzielczość (może wymagać kalibracji dla dokładności)
-const float ADC_VREF = 3.2;       // Typowe napięcie referencyjne dla ESP32
-const float ADC_MAX_VALUE = 4095.0; // Dla domyślnej rozdzielczości 12-bit
+// Napięcie referencyjne ADC ESP32 i rozdzielczość 12-bit
+// ADC_VREF może wymagać kalibracji per-płytka (typowo 3.1–3.3V)
+const float ADC_VREF      = 3.2f;
+const float ADC_MAX_VALUE = 4095.0f;
+
+// Liczba próbek do uśrednienia odczytu ADC
+const int NUM_READINGS = 10;
 
 void batteryMonitorSetup() {
-    adcPin = configGetBatteryAdcPin();
+    adcPin = configGetBatteryAdcPin(); // powinno zwrócić 35
+
     if (adcPin != 255) {
-         Serial.printf("  [Bateria] Skonfigurowano pin ADC: %d (Mnożnik napięcia: %.2f)\n", adcPin, VOLTAGE_MULTIPLIER);
-         // Dla wejść analogowych zwykle nie ustawia się pinMode, ale można ustawić tłumienie/attenuation
-         // np. analogSetPinAttenuation(adcPin, ADC_11db); // Dla pełnego zakresu 0-3.3V (domyślne)
+        // GPIO35 jest input-only – nie wywołujemy pinMode
+        // Ustaw tłumienie ADC na pełny zakres 0–3.3V
+        analogSetPinAttenuation(adcPin, ADC_11db);
+        Serial.printf("  [Bateria] Pin ADC: GPIO%d | Dzielnik LOLIN D32 (wbudowany 1:2) | Mnożnik: %.1f\n",
+                      adcPin, VOLTAGE_MULTIPLIER);
     } else {
-        Serial.println("  [Bateria] BŁĄD: Nie skonfigurowano poprawnie pinu ADC baterii!");
+        Serial.println("  [Bateria] BŁĄD: Nieprawidłowy pin ADC baterii!");
     }
 }
 
 int batteryMonitorReadRawADC() {
-     if (adcPin == 255) return 0; // Zwróć 0 jeśli pin nie jest skonfigurowany
-     return analogRead(adcPin);
+    if (adcPin == 255) return 0;
+    return analogRead(adcPin);
 }
 
 float batteryMonitorReadVoltage() {
-    if (adcPin == 255) return 0.0;
+    if (adcPin == 255) return 0.0f;
 
-    int numReadings = 10; // Liczba odczytów do uśrednienia
-    uint32_t totalRawAdc = 0;
-    for (int i = 0; i < numReadings; i++) {
-        totalRawAdc += analogRead(adcPin);
-        delay(1); // Mała pauza między odczytami
+    // Uśrednij NUM_READINGS odczytów dla stabilności
+    uint32_t total = 0;
+    for (int i = 0; i < NUM_READINGS; i++) {
+        total += analogRead(adcPin);
+        delay(1);
     }
-    int rawAdc = totalRawAdc / numReadings; // Uśredniona wartość ADC
+    int rawAdc = total / NUM_READINGS;
 
-    // Reszta obliczeń jak poprzednio...
+    // Przelicz ADC → napięcie na pinie → napięcie baterii
     float vAdc = (float)rawAdc * (ADC_VREF / ADC_MAX_VALUE);
     float vBat = vAdc * VOLTAGE_MULTIPLIER;
 
-    Serial.printf("  [Bateria] Odczyt ADC(avg)=%d -> V_adc=%.2fV -> V_BAT=%.2fV\n", rawAdc, vAdc, vBat);
+    Serial.printf("  [Bateria] ADC=%d | V_pin=%.3fV | V_BAT=%.3fV\n", rawAdc, vAdc, vBat);
 
     return vBat;
+}
+
+int batteryMonitorReadMilliVolts() {
+    return (int)(batteryMonitorReadVoltage() * 1000.0f);
+}
+
+bool batteryMonitorIsLow() {
+    int mv = batteryMonitorReadMilliVolts();
+    int threshold = configGetLowBatteryMilliVolts();
+    bool low = (mv > 0) && (mv < threshold);
+    if (low) {
+        Serial.printf("  [Bateria] ALARM: Niskie napięcie! %d mV < próg %d mV\n", mv, threshold);
+    }
+    return low;
 }

@@ -20,5 +20,7 @@ float batteryMonitorReadVoltage();
  * @return int ADC value (0-4095).
  */
 int batteryMonitorReadRawADC();
+int  batteryMonitorReadMilliVolts();
+bool batteryMonitorIsLow();
 
 #endif // BATTERYMONITOR_H
