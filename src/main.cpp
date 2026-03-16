@@ -29,7 +29,8 @@
  #include "ButtonManager.h"
  #include "LedManager.h"
  #include <Preferences.h>
- 
+ #include "test.h"  
+
  // Configuration constants
 
  constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 120;
@@ -92,6 +93,8 @@
      
      // Load configuration
      configSetup();
+
+     testPrintConfig();
 
      // Module initialization
      ledManagerSetup(configGetLedPin(), HIGH);
@@ -181,6 +184,7 @@
      // Network handling
      if (WiFi.status() == WL_CONNECTED) {
          // Attempt to reconnect to Blynk if disconnected
+         #ifndef TEST_MODE
          if (!blynkIsConnected()) {
              unsigned long currentTime = millis();
              if (currentTime - g_lastBlynkReconnectAttempt > BLYNK_RECONNECT_INTERVAL_MS) {
@@ -190,6 +194,7 @@
              }
          }
          blynkRun();
+         #endif
      } else if (!alarmManagerIsAlarmActive() && !pumpControlIsRunning()) {
          Serial.println(F("Brak aktywnego alarmu oraz połączenia z siecią - włączam tryb uśpienia"));
          ledManagerTurnOff();
