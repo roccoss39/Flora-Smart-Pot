@@ -15,6 +15,19 @@ Lekki backend pod aplikację Flutter (`mobile_app`) i firmware ESP32.
 
 Wszystko trzymane lokalnie w SQLite (dobrze działa na Raspberry Pi Zero 2).
 
+## Konfiguracja firmware ESP32 (normal + TEST_MODE)
+
+W `include/secrets.h` ustaw:
+
+```cpp
+#define FLORA_BACKEND_BASE_URL "http://<IP_SERWERA>:8080"
+#define FLORA_BACKEND_TOKEN "tu_wstaw_mocny_token"
+#define FLORA_BACKEND_DEVICE_ID "flora-1"
+```
+
+`src/main.cpp` wysyła telemetry po starcie, cyklu pomiarowym i przy zmianie alarmu.
+To działa zarówno dla normalnego buildu, jak i `*_test`, bo oba używają tego samego `main.cpp`.
+
 ## Szybki start (Linux / Raspberry Pi)
 
 ```bash

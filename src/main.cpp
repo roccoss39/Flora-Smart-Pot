@@ -14,6 +14,11 @@
  #include <cmath>
  #include <WiFi.h>
  #include <WiFiManager.h>
+ #include <HTTPClient.h>
+
+ #if __has_include("secrets.h")
+ #include "secrets.h"
+ #endif
  
  // System modules
  #include "DeviceConfig.h"
@@ -33,6 +38,18 @@
 
  constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 120;
  constexpr uint8_t WIFI_CONNECTION_TIMEOUT_SEC = 10;
+
+ #ifndef FLORA_BACKEND_BASE_URL
+ #define FLORA_BACKEND_BASE_URL "http://127.0.0.1:8080"
+ #endif
+
+ #ifndef FLORA_BACKEND_TOKEN
+ #define FLORA_BACKEND_TOKEN "replace_me"
+ #endif
+
+ #ifndef FLORA_BACKEND_DEVICE_ID
+ #define FLORA_BACKEND_DEVICE_ID "flora-1"
+ #endif
  
  /**
   * @struct SensorData
@@ -72,6 +89,7 @@
  void handleMeasurementCycle();
  void setMeasuringStatus(bool isActive);
  void setConnectingWifiStatus(bool isActive);
+ bool backendSendTelemetry(const SensorData& data);
  
  /**
   * @brief Device configuration at startup
@@ -128,6 +146,7 @@
      // Operations after WiFi connection attempt
      if (wifiConnected) {
          Serial.println(F("Połączenie WiFi aktywne (Blynk wyłączony w main)."));
+         backendSendTelemetry(g_latestSensorData);
      } else {
          Serial.println(F("Pomijam wysyłkę pierwszych danych - brak połączenia WiFi."));         
      }
@@ -200,6 +219,7 @@
      // Log alarm state change (cloud integration currently disabled in main)
      if (alarmStateChanged) {
          Serial.printf("[Loop] Zmiana stanu alarmu: %s\n", alarmManagerIsAlarmActive() ? "AKTYWNY" : "NIEAKTYWNY");
+         backendSendTelemetry(g_latestSensorData);
      }
      
      updateLedBasedOnState();
@@ -259,16 +279,14 @@
  /**
   * @brief Wykonanie pełnego cyklu pomiarowego
   */
- void handleMeasurementCycle() {
+void handleMeasurementCycle() {
      // Read sensors
      g_latestSensorData = performMeasurement();
      
      // Display results
      displayMeasurements(g_latestSensorData);
  
-     if (WiFi.status() != WL_CONNECTED) {
-         Serial.println(F("Brak WiFi - pomijam wysyłkę danych do chmury."));
-     }
+     backendSendTelemetry(g_latestSensorData);
      
      Serial.print(F("Stan alarmu: "));
      Serial.println(alarmManagerIsAlarmActive());
@@ -278,7 +296,58 @@
  
      // Aktualizacja czasu ostatniego pomiaru
      g_lastMeasurementTime = millis();
- }
+}
+
+/**
+ * @brief Wysyła telemetry snapshot do backendu mobile_backend
+ */
+bool backendSendTelemetry(const SensorData& data) {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println(F("[Backend] Brak WiFi - pomijam telemetry push."));
+        return false;
+    }
+
+    HTTPClient http;
+    const String url = String(FLORA_BACKEND_BASE_URL) + "/api/flora/" + FLORA_BACKEND_DEVICE_ID + "/telemetry";
+    http.begin(url);
+    http.setTimeout(3000);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", String("Bearer ") + FLORA_BACKEND_TOKEN);
+
+    const bool dhtValid = !isnan(data.temperature) && !isnan(data.humidity);
+    const float temp = dhtValid ? data.temperature : 0.0f;
+    const float humid = dhtValid ? data.humidity : 0.0f;
+
+    char payload[512];
+    snprintf(
+        payload,
+        sizeof(payload),
+        "{\"snapshot\":{\"soilMoisturePercent\":%d,\"waterLevel\":%d,\"batteryVoltage\":%.2f,\"temperature\":%.2f,"
+        "\"humidity\":%.2f,\"pumpRunning\":%s,\"alarmActive\":%s,\"updatedAt\":\"\"}}",
+        data.soilMoisture,
+        data.waterLevel,
+        data.batteryVoltage,
+        temp,
+        humid,
+        pumpControlIsRunning() ? "true" : "false",
+        alarmManagerIsAlarmActive() ? "true" : "false");
+
+    const int httpCode = http.POST((uint8_t*)payload, strlen(payload));
+    if (httpCode > 0) {
+        String response = http.getString();
+        Serial.printf("[Backend] Telemetry HTTP %d\n", httpCode);
+        if (httpCode >= 200 && httpCode < 300) {
+            http.end();
+            return true;
+        }
+        Serial.printf("[Backend] Odpowiedź: %s\n", response.c_str());
+    } else {
+        Serial.printf("[Backend] Błąd POST: %s\n", http.errorToString(httpCode).c_str());
+    }
+
+    http.end();
+    return false;
+}
  
  /**
   * @brief Odczyt wszystkich sensorów
