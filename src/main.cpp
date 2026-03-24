@@ -83,7 +83,7 @@
  void setup() {
      Serial.begin(115200);
      delay(100);
-     //clearPreferencesData("flaura_cfg_1");
+     clearPreferencesData("flaura_cfg_1"); // comment in normal mode
      Serial.println(F("\n--- Flora Smart Pot - Main Start ---"));
      print_wakeup_reason();
  
