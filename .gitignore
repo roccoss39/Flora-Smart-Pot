@@ -36,3 +36,20 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Python virtualenv/cache (backend + local tools)
+.venv/
+**/.venv/
+**/__pycache__/
+*.pyc
+
+# Local backend runtime data
+mobile_backend/*.db
+
+# Flutter local/generated artifacts
+mobile_app/.dart_tool/
+mobile_app/.flutter-plugins
+mobile_app/.flutter-plugins-dependencies
+mobile_app/.metadata
+mobile_app/build/
+mobile_app/*.iml
