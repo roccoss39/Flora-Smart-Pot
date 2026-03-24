@@ -4,8 +4,8 @@
  * @version 1.0
  * @date 2025-05-01
  * 
- * Program controlling smart plant pot with moisture monitoring,
- * irrigation management and Blynk cloud communication.
+ * Program controlling smart plant pot with moisture monitoring
+ * and irrigation management.
  */
 
  #include <Arduino.h>
@@ -14,11 +14,14 @@
  #include <cmath>
  #include <WiFi.h>
  #include <WiFiManager.h>
+ #include <HTTPClient.h>
+
+ #if __has_include("secrets.h")
+ #include "secrets.h"
+ #endif
  
  // System modules
  #include "DeviceConfig.h"
- #include "secrets.h"  // Contains BLYNK_AUTH_TOKEN
- #include "BlynkManager.h"
  #include "SoilSensor.h"
  #include "WaterLevelSensor.h"
  #include "PumpControl.h"
@@ -35,7 +38,18 @@
 
  constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 120;
  constexpr uint8_t WIFI_CONNECTION_TIMEOUT_SEC = 10;
- constexpr uint16_t BLYNK_RECONNECT_INTERVAL_MS = 15000;
+
+ #ifndef FLORA_BACKEND_BASE_URL
+ #define FLORA_BACKEND_BASE_URL "http://127.0.0.1:8080"
+ #endif
+
+ #ifndef FLORA_BACKEND_TOKEN
+ #define FLORA_BACKEND_TOKEN "replace_me"
+ #endif
+
+ #ifndef FLORA_BACKEND_DEVICE_ID
+ #define FLORA_BACKEND_DEVICE_ID "flora-1"
+ #endif
  
  /**
   * @struct SensorData
@@ -62,7 +76,6 @@
  namespace {
      SensorData g_latestSensorData;
      unsigned long g_lastMeasurementTime = 0;
-     unsigned long g_lastBlynkReconnectAttempt = 0;
      bool g_isMeasuring = false;
      bool g_isConnectingWifi = false;
  }
@@ -76,6 +89,7 @@
  void handleMeasurementCycle();
  void setMeasuringStatus(bool isActive);
  void setConnectingWifiStatus(bool isActive);
+ bool backendSendTelemetry(const SensorData& data);
  
  /**
   * @brief Device configuration at startup
@@ -130,19 +144,11 @@
      bool wifiConnected = setupWiFiConnection();
      
      // Operations after WiFi connection attempt
-     if (wifiConnected && blynkIsConnected()) {
-         Serial.println(F("Wysyłanie pierwszych danych do Blynk..."));
-         blynkSendSensorData(
-             g_latestSensorData.soilMoisture, 
-             g_latestSensorData.waterLevel, 
-             g_latestSensorData.batteryVoltage,
-             g_latestSensorData.temperature, 
-             g_latestSensorData.humidity,
-             pumpControlIsRunning(), 
-             alarmManagerIsAlarmActive()
-         );
+     if (wifiConnected) {
+         Serial.println(F("Połączenie WiFi aktywne (Blynk wyłączony w main)."));
+         backendSendTelemetry(g_latestSensorData);
      } else {
-         Serial.println(F("Pomijam wysyłkę pierwszych danych - brak połączenia."));         
+         Serial.println(F("Pomijam wysyłkę pierwszych danych - brak połączenia WiFi."));         
      }
      
      g_lastMeasurementTime = millis();
@@ -158,11 +164,6 @@
      if (shouldSleep) {
          ledManagerTurnOff();
          Serial.println(F("Konfiguruję wybudzanie i przechodzę w Deep Sleep..."));
-         
-         if (blynkIsConnected()) {
-             blynkDisconnect();
-         }
-         
          powerManagerGoToDeepSleep();
      } else {
          if (pumpControlIsRunning()) {
@@ -183,18 +184,7 @@
      
      // Network handling
      if (WiFi.status() == WL_CONNECTED) {
-         // Attempt to reconnect to Blynk if disconnected
-         #ifndef TEST_MODE
-         if (!blynkIsConnected()) {
-             unsigned long currentTime = millis();
-             if (currentTime - g_lastBlynkReconnectAttempt > BLYNK_RECONNECT_INTERVAL_MS) {
-                 Serial.println(F("[Loop] Blynk rozłączony (WiFi jest), próba połączenia..."));
-                 blynkConnect(1000);
-                 g_lastBlynkReconnectAttempt = currentTime;
-             }
-         }
-         blynkRun();
-         #endif
+         // WiFi connected; cloud handling moved out of main (Blynk disabled here)
      } else if (!alarmManagerIsAlarmActive() && !pumpControlIsRunning()) {
          Serial.println(F("Brak aktywnego alarmu oraz połączenia z siecią - włączam tryb uśpienia"));
          ledManagerTurnOff();
@@ -215,11 +205,6 @@
          if (!pumpControlIsRunning() && !alarmManagerIsAlarmActive()) {
              Serial.println(F("[Loop] Pompa zakończyła pracę w trybie Deep Sleep, przechodzę do uśpienia..."));
              ledManagerTurnOff();
-             
-             if (blynkIsConnected()) {
-                 blynkDisconnect();
-             }
-             
              powerManagerGoToDeepSleep();
          }
      }
@@ -231,17 +216,10 @@
          g_latestSensorData.soilMoisture
      );
      
-     // Send data to Blynk when alarm state changes
-     if (alarmStateChanged && blynkIsConnected()) {
-         blynkSendSensorData(
-             g_latestSensorData.soilMoisture, 
-             g_latestSensorData.waterLevel, 
-             g_latestSensorData.batteryVoltage,
-             g_latestSensorData.temperature, 
-             g_latestSensorData.humidity,
-             pumpControlIsRunning(), 
-             alarmManagerIsAlarmActive()
-         );
+     // Log alarm state change (cloud integration currently disabled in main)
+     if (alarmStateChanged) {
+         Serial.printf("[Loop] Zmiana stanu alarmu: %s\n", alarmManagerIsAlarmActive() ? "AKTYWNY" : "NIEAKTYWNY");
+         backendSendTelemetry(g_latestSensorData);
      }
      
      updateLedBasedOnState();
@@ -286,15 +264,8 @@
          Serial.println(WiFi.localIP());
          connectSuccess = true;
          
-         // Konfiguracja Blynk
-         blynkConfigure(BLYNK_AUTH_TOKEN, BLYNK_TEMPLATE_ID, BLYNK_TEMPLATE_NAME);
-         
-         if (!blynkConnect()) {
-             Serial.println(F("OSTRZEŻENIE: Nie udało się połączyć z Blynk mimo połączenia WiFi."));
-         } else {
-             Serial.println(F("Połączono z Blynk."));
-             powerManagerSyncTime();
-         }
+         // Synchronizacja czasu po udanym połączeniu WiFi
+         powerManagerSyncTime();
      } else {
          Serial.println(F("\nOSTRZEŻENIE: Nie udało się połączyć z WiFi lub skonfigurować."));
          Serial.println(F("Przechodzę w tryb OFFLINE."));
@@ -308,27 +279,14 @@
  /**
   * @brief Wykonanie pełnego cyklu pomiarowego
   */
- void handleMeasurementCycle() {
+void handleMeasurementCycle() {
      // Read sensors
      g_latestSensorData = performMeasurement();
      
      // Display results
      displayMeasurements(g_latestSensorData);
  
-     // Send data to Blynk
-     if (WiFi.status() == WL_CONNECTED && blynkIsConnected()) {
-         blynkSendSensorData(
-             g_latestSensorData.soilMoisture, 
-             g_latestSensorData.waterLevel, 
-             g_latestSensorData.batteryVoltage,
-             g_latestSensorData.temperature, 
-             g_latestSensorData.humidity,
-             pumpControlIsRunning(), 
-             alarmManagerIsAlarmActive()
-         );
-     } else {
-         Serial.println(F("Pomijam wysyłkę do Blynk - brak połączenia."));
-     }
+     backendSendTelemetry(g_latestSensorData);
      
      Serial.print(F("Stan alarmu: "));
      Serial.println(alarmManagerIsAlarmActive());
@@ -338,7 +296,58 @@
  
      // Aktualizacja czasu ostatniego pomiaru
      g_lastMeasurementTime = millis();
- }
+}
+
+/**
+ * @brief Wysyła telemetry snapshot do backendu mobile_backend
+ */
+bool backendSendTelemetry(const SensorData& data) {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println(F("[Backend] Brak WiFi - pomijam telemetry push."));
+        return false;
+    }
+
+    HTTPClient http;
+    const String url = String(FLORA_BACKEND_BASE_URL) + "/api/flora/" + FLORA_BACKEND_DEVICE_ID + "/telemetry";
+    http.begin(url);
+    http.setTimeout(3000);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", String("Bearer ") + FLORA_BACKEND_TOKEN);
+
+    const bool dhtValid = !isnan(data.temperature) && !isnan(data.humidity);
+    const float temp = dhtValid ? data.temperature : 0.0f;
+    const float humid = dhtValid ? data.humidity : 0.0f;
+
+    char payload[512];
+    snprintf(
+        payload,
+        sizeof(payload),
+        "{\"snapshot\":{\"soilMoisturePercent\":%d,\"waterLevel\":%d,\"batteryVoltage\":%.2f,\"temperature\":%.2f,"
+        "\"humidity\":%.2f,\"pumpRunning\":%s,\"alarmActive\":%s,\"updatedAt\":\"\"}}",
+        data.soilMoisture,
+        data.waterLevel,
+        data.batteryVoltage,
+        temp,
+        humid,
+        pumpControlIsRunning() ? "true" : "false",
+        alarmManagerIsAlarmActive() ? "true" : "false");
+
+    const int httpCode = http.POST((uint8_t*)payload, strlen(payload));
+    if (httpCode > 0) {
+        String response = http.getString();
+        Serial.printf("[Backend] Telemetry HTTP %d\n", httpCode);
+        if (httpCode >= 200 && httpCode < 300) {
+            http.end();
+            return true;
+        }
+        Serial.printf("[Backend] Odpowiedź: %s\n", response.c_str());
+    } else {
+        Serial.printf("[Backend] Błąd POST: %s\n", http.errorToString(httpCode).c_str());
+    }
+
+    http.end();
+    return false;
+}
  
  /**
   * @brief Odczyt wszystkich sensorów
