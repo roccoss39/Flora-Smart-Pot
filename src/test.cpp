@@ -28,7 +28,7 @@ static int TEST_SOIL_MOISTURE = 25;
 
 // Poziom wody w zbiorniku [0-5]
 // 0 = pusty, 5 = pełny
-static int TEST_WATER_LEVEL = 2;
+static int TEST_WATER_LEVEL = 0;
 
 // Napięcie baterii [V]
 // Typowy zakres LiPo: 3.0 V (pusta) – 4.2 V (pełna)
@@ -133,19 +133,24 @@ bool environmentSensorRead(float &temperature, float &humidity) {
 // --- PumpControl ---
 void pumpControlSetup() {
     Serial.println(F("[TEST] pumpControlSetup() – stub"));
+
+    pinMode(configGetPumpPin(), OUTPUT);
+    digitalWrite(configGetPumpPin(), LOW);   // pompa wyłączona na start
 }
 void pumpControlUpdate() {}
 bool pumpControlIsRunning() {
     return TEST_PUMP_RUNNING;
 }
 void pumpControlActivateIfNeeded(int soilPercent, int waterLevel) {
+    Serial.printf("DEBUG pumpPin = %d\n", configGetPumpPin());
+
     if (waterLevel > 0 && soilPercent < configGetSoilThresholdPercent()) {
-        Serial.println("[TEST] POMPA → GPIO15 HIGH");
-        pinMode(configGetPumpPin(), OUTPUT);
-        digitalWrite(configGetPumpPin(), HIGH);   // ← to zmierzysz miernikiem
+        Serial.println("[TEST] POMPA → GPIO HIGH");
+        digitalWrite(configGetPumpPin(), HIGH);
         TEST_PUMP_RUNNING = true;
-    } else {
-        Serial.println("[TEST] POMPA → GPIO15 LOW");
+    } 
+    else {
+        Serial.println("[TEST] POMPA → GPIO LOW");
         digitalWrite(configGetPumpPin(), LOW);
         TEST_PUMP_RUNNING = false;
     }
