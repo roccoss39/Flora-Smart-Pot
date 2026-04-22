@@ -443,32 +443,33 @@ struct SensorData {
 ### Default Pin Assignments
 
 ```cpp
-// Soil Sensor
-#define DEFAULT_SOIL_PIN         36  // A0
-#define DEFAULT_SOIL_VCC_PIN     4
+// Profile: BOARD_LOLIN_D32 (env:lolin_d32)
+DEFAULT_SOIL_PIN         = 34;
+DEFAULT_SOIL_VCC_PIN     = 4;
+DEFAULT_WATER_LEVEL      = {33, 25, 26, 27, 14};
+DEFAULT_WATER_GROUND     = 32;
+DEFAULT_PUMP_PIN         = 15;
+DEFAULT_BATTERY_ADC_PIN  = 35;
+DEFAULT_DHT_PIN          = 16;
+DEFAULT_DHT_POWER_PIN    = 17;
+DEFAULT_MPU_INT_PIN      = 13;
+DEFAULT_BUZZER_PIN       = 23;
+DEFAULT_LED_PIN          = 5;
+DEFAULT_BUTTON_PIN       = 0;
 
-// DHT11 Sensor
-#define DEFAULT_DHT_PIN          2
-#define DEFAULT_DHT_POWER_PIN    5
-
-// Water Level Sensor
-#define DEFAULT_WATER_LEVEL_1    12
-#define DEFAULT_WATER_LEVEL_2    13
-#define DEFAULT_WATER_LEVEL_3    14
-#define DEFAULT_WATER_LEVEL_4    15
-#define DEFAULT_WATER_LEVEL_5    16
-#define DEFAULT_WATER_GROUND     17
-
-// Control Outputs
-#define DEFAULT_PUMP_PIN         18
-#define DEFAULT_BUZZER_PIN       19
-#define DEFAULT_LED_PIN          21
-
-// Input
-#define DEFAULT_BUTTON_PIN       0
-
-// Battery Monitor
-#define DEFAULT_BATTERY_ADC_PIN  39  // A3
+// Profile: LOLIN32 v1.0.0 (env:lolin32, no BOARD_LOLIN_D32)
+DEFAULT_SOIL_PIN         = 33;
+DEFAULT_SOIL_VCC_PIN     = 19;
+DEFAULT_WATER_LEVEL      = {13, 14, 27, 26, 25}; // original Flaura order
+DEFAULT_WATER_GROUND     = 35;
+DEFAULT_PUMP_PIN         = 23;
+DEFAULT_BATTERY_ADC_PIN  = 32;
+DEFAULT_DHT_PIN          = 255; // disabled
+DEFAULT_DHT_POWER_PIN    = 255; // disabled
+DEFAULT_MPU_INT_PIN      = 255; // disabled
+DEFAULT_BUZZER_PIN       = 255; // disabled
+DEFAULT_LED_PIN          = 255; // disabled
+DEFAULT_BUTTON_PIN       = 0;
 ```
 
 ### Default Thresholds

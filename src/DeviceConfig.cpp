@@ -67,22 +67,28 @@ constexpr uint8_t LED_PIN                              = 5;   // LED_BUILTIN na 
 // ── LOLIN32 v1.0.0 (domyślny, brak flagi) ───────────────────
 static const char* BOARD_NAME = "LOLIN32 v1.0.0";
 
-const uint8_t  DEFAULT_SOIL_VCC_PIN                    = 26;
-const uint8_t  DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { 19, 18, 5, 17, 16 };
-const uint8_t  DEFAULT_WL_GROUND_PIN                   = 32;  // GPIO39=input-only – nie używamy
+// Profil zgodny z oryginalnym projektem Flaura (Flaura_Blynk.ino):
+// bez DHT i bez MPU, z mapą pinów pod klasyczny zestaw czujników.
+const uint8_t  DEFAULT_SOIL_VCC_PIN                    = 19;
+const uint8_t  DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { 13, 14, 27, 26, 25 };
+const uint8_t  DEFAULT_WL_GROUND_PIN                   = 35;
 const uint8_t  DEFAULT_PUMP_PIN                        = 23;
-const uint8_t  DEFAULT_BAT_ADC_PIN                     = 33;  // zewnętrzny dzielnik R1/R4
-const uint8_t  DEFAULT_DHT_PIN                         = 14;
-const uint8_t  DEFAULT_DHT_PWR_PIN                     = 27;
-const uint8_t  DEFAULT_MPU_INT_PIN                     = 35;
+const uint8_t  DEFAULT_BAT_ADC_PIN                     = 32;
+const uint8_t  DEFAULT_DHT_PIN                         = 255; // brak DHT w tym profilu
+const uint8_t  DEFAULT_DHT_PWR_PIN                     = 255; // brak DHT w tym profilu
+const uint8_t  DEFAULT_MPU_INT_PIN                     = 255; // brak MPU w tym profilu
 const uint8_t  DEFAULT_BUTTON_PIN                      = 0;
-const uint8_t  DEFAULT_BUZZER_PIN                      = 23;
-constexpr uint8_t LED_PIN                              = 22;  // UWAGA: I2C SCL – nie używaj razem z MPU
+const uint8_t  DEFAULT_BUZZER_PIN                      = 255; // brak buzzera w oryginale
+constexpr uint8_t LED_PIN                              = 255; // brak dedykowanej LED statusu
 
 #endif
 
 // ── Wspólne dla wszystkich płytek ────────────────────────────
+#ifdef BOARD_LOLIN_D32
 const uint8_t  DEFAULT_SOIL_PIN                = 34;
+#else
+const uint8_t  DEFAULT_SOIL_PIN                = 33;
+#endif
 const int      DEFAULT_SOIL_DRY                = 2621;
 const int      DEFAULT_SOIL_WET                = 950;   // TO CALIBRATE
 const uint16_t DEFAULT_WL_THRESHOLD            = 2000;
