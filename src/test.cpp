@@ -28,7 +28,7 @@ static int TEST_SOIL_MOISTURE = 25;
 
 // Poziom wody w zbiorniku [0-5]
 // 0 = pusty, 5 = pełny
-static int TEST_WATER_LEVEL = 0;
+static int TEST_WATER_LEVEL = 1;
 
 // Napięcie baterii [V]
 // Typowy zakres LiPo: 3.0 V (pusta) – 4.2 V (pełna)
