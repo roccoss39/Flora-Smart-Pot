@@ -15,6 +15,7 @@
  #include <WiFi.h>
  #include <WiFiManager.h>
  #include <HTTPClient.h>
+ #include <ArduinoJson.h>
 
  #if __has_include("secrets.h")
  #include "secrets.h"
@@ -80,6 +81,11 @@
      bool g_isConnectingWifi = false;
  }
  
+ // Zmienne do śledzenia czasu i komend
+static unsigned long g_lastCommandCheckTime = 0;
+int g_lastCommandId = 0;
+const unsigned long COMMAND_CHECK_INTERVAL_MS = 1000; 
+
  // Function declarations
  SensorData performMeasurement();
  void displayMeasurements(const SensorData& data);
@@ -90,17 +96,20 @@
  void setMeasuringStatus(bool isActive);
  void setConnectingWifiStatus(bool isActive);
  bool backendSendTelemetry(const SensorData& data);
- 
+ void fetchAndExecuteCommands();
  /**
   * @brief Device configuration at startup
   */
  void setup() {
      Serial.begin(115200);
      delay(100);
+     g_lastCommandId = configGetLastCommandId();
+     Serial.printf("System start. Ostatnie ID komendy z Flash: %d\n", g_lastCommandId);
+
      clearPreferencesData("flaura_cfg_1"); // comment in normal mode
      Serial.println(F("\n--- Flora Smart Pot - Main Start ---"));
      print_wakeup_reason();
- 
+    
      // I2C initialization
      Wire.begin();
      delay(100);
@@ -152,6 +161,8 @@
      }
      
      g_lastMeasurementTime = millis();
+
+     fetchAndExecuteCommands();
      
      // Kontrola pompy na podstawie pierwszego pomiaru
      pumpControlActivateIfNeeded(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel);
@@ -185,6 +196,7 @@
      // Network handling
      if (WiFi.status() == WL_CONNECTED) {
          // WiFi connected; cloud handling moved out of main (Blynk disabled here)
+         fetchAndExecuteCommands();
      } else if (!alarmManagerIsAlarmActive() && !pumpControlIsRunning()) {
          Serial.println(F("Brak aktywnego alarmu oraz połączenia z siecią - włączam tryb uśpienia"));
          ledManagerTurnOff();
@@ -490,3 +502,62 @@ bool backendSendTelemetry(const SensorData& data) {
          ledManagerSetState(LED_OFF);  // Normalny stan
      }
  }
+
+ void fetchAndExecuteCommands() {
+    static bool firstCheckDone = false; // Zapamiętuje, czy zrobiliśmy już pierwszy darmowy strzał
+
+    // Jeśli to pierwsze sprawdzenie LUB minęły 2 sekundy -> pobieraj
+    if (!firstCheckDone || (millis() - g_lastCommandCheckTime >= COMMAND_CHECK_INTERVAL_MS)) {
+        g_lastCommandCheckTime = millis();
+        firstCheckDone = true;
+    } else {
+        return; // W przeciwnym razie przerwij i czekaj
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+        return; 
+    }
+
+    HTTPClient http;
+    // Budujemy adres: http://192.168.x.x:8080/api/flora/flora-1/commands?after_id=X
+    String url = String(FLORA_BACKEND_BASE_URL) + "/api/flora/" + FLORA_BACKEND_DEVICE_ID + "/commands?after_id=" + String(g_lastCommandId);
+    
+    http.begin(url);
+    http.setTimeout(2000); // Szybki timeout
+    http.addHeader("Authorization", String("Bearer ") + FLORA_BACKEND_TOKEN);
+
+    int httpCode = http.GET();
+    if (httpCode >= 200 && httpCode < 300) {
+        String payload = http.getString();
+        
+        // Dekodujemy JSON-a
+        DynamicJsonDocument doc(4096);
+        DeserializationError error = deserializeJson(doc, payload);
+
+        if (!error) {
+            JsonArray items = doc["items"];
+            for (JsonObject item : items) {
+                int currentId = item["id"].as<int>(); 
+                String type = item["type"].as<String>();
+
+                // Jeśli serwer kazał włączyć pompę:
+                if (type == "pump") {
+                    int durationMs = item["payload"]["durationMs"];
+                    Serial.printf("[Backend] Wykryto komendę PUMP! Czas: %d ms\n", durationMs);
+                    pumpControlManualTurnOn(durationMs);
+                    Serial.printf("Current ID:%d , lastcom:%d", currentId, g_lastCommandId);
+                }
+
+                // Zapisujemy ID, żeby nie wykonać tej samej komendy dwa razy
+                if (currentId > g_lastCommandId) {
+                    g_lastCommandId = currentId;
+                    configSetLastCommandId(g_lastCommandId); // Zapis do Flash!
+                }
+            }
+        } else {
+            Serial.println("[Backend] Błąd odczytu JSON-a z komendami.");
+            Serial.println(error.c_str());
+        }
+    }
+    http.end();
+}

@@ -10,6 +10,10 @@ const char* PREF_NAMESPACE = "flaura_cfg_1";
 #define PREF_MEASUREMENT_MINUTE "meas_min"
 
 // --- Klucze dla Preferences ---
+// --- Nowe klucze dla trwałej pamięci komend ---
+static const char* NVS_NAMESPACE_CMDS = "flora_cmds";
+static const char* KEY_LAST_ID = "last_id";
+
 const char* PREF_SOIL_PIN       = "soilPin";
 const char* PREF_SOIL_DRY       = "soilDry";
 const char* PREF_SOIL_WET       = "soilWet";
@@ -96,7 +100,7 @@ const uint32_t DEFAULT_PUMP_RUN_MS             = 3000;
 const int      DEFAULT_SOIL_THRESHOLD          = 50;
 const int      DEFAULT_LOW_BATTERY_MV          = 3300;
 const uint32_t DEFAULT_SLEEP_SECONDS           = 86400; // 24 h
-const bool     DEFAULT_CONTINUOUS_MODE         = true;  // Zmień na false przed deploymentem
+const bool     DEFAULT_CONTINUOUS_MODE         = false;  // Zmień na false przed deploymentem
 const uint32_t DEFAULT_BLYNK_SEND_INTERVAL_SEC = 30;
 const bool     DEFAULT_ALARM_SOUND_ENABLED     = true;
 const int      DEFAULT_LOW_SOIL_PERCENT        = 40;
@@ -226,6 +230,22 @@ void configSetup() {
     Serial.printf("  Moc pompy (Duty Cycle):        %d/255\n", pumpDutyCycle);
     Serial.printf("  Pin LED:                       %d\n", ledPin);
     Serial.println("==========================================\n");
+}
+
+int configGetLastCommandId() {
+    Preferences cmdsPrefs;
+    cmdsPrefs.begin(NVS_NAMESPACE_CMDS, true); // Tryb tylko do odczytu
+    int id = cmdsPrefs.getInt(KEY_LAST_ID, 0); // Domyślnie 0, jeśli brak wpisu
+    cmdsPrefs.end();
+    return id;
+}
+
+void configSetLastCommandId(int id) {
+    Preferences cmdsPrefs;
+    cmdsPrefs.begin(NVS_NAMESPACE_CMDS, false); // Tryb do zapisu
+    cmdsPrefs.putInt(KEY_LAST_ID, id);
+    cmdsPrefs.end();
+    Serial.printf("  [Config] Zapisano nowy LastCommandID do Flash: %d\n", id);
 }
 
 // =============================================================
