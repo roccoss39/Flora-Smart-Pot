@@ -64,63 +64,56 @@ pio run -e lolin_d32 --target upload
 ### ESP32 DevKit / LOLIN32 v1.0.0 ⚠️
 
 ```ini
-pio run -e esp32dev
-pio run -e esp32dev --target upload
+pio run -e lolin32
+pio run -e lolin32 --target upload
 ```
-
-> **⚠️ Known pin conflicts on this board (see table below):**  
-> GPIO 2 (strapping) and GPIO 12 (strapping) are used in the *default* mapping.  
-> If you experience boot failures, switch to the LOLIN D32 pin profile or remap manually.
 
 ---
 
 ## 📐 Pin Configuration
 
-Two separate pin profiles are maintained in `include/pins.h` and selected at compile time via the `BOARD_LOLIN_D32` build flag.
+Two separate pin profiles are maintained in `src/DeviceConfig.cpp` and selected at compile time via the `BOARD_LOLIN_D32` build flag.
 
 ### LOLIN D32 – Safe Pin Mapping
 
 | Component | GPIO | ADC-safe with WiFi | Notes |
 |-----------|------|--------------------|-------|
-| Soil Sensor (ADC) | **36** | ✅ ADC1 | Input only |
+| Soil Sensor (ADC) | **34** | ✅ ADC1 | Input only |
 | Soil Sensor (VCC) | **4** | – | 3.3 V switch |
-| DHT11 Data | **33** | – | Moved from GPIO 2 (strapping) |
-| DHT11 Power | **13** | – | Moved from GPIO 5 (LED_BUILTIN) |
-| Water Level 1 | **25** | – | Moved from GPIO 12 (strapping) |
-| Water Level 2 | **26** | – | |
-| Water Level 3 | **27** | – | |
-| Water Level 4 | **32** | – | Moved from GPIO 15 (strapping) |
+| DHT11 Data | **16** | – | |
+| DHT11 Power | **17** | – | |
+| Water Level 1 | **33** | – | |
+| Water Level 2 | **25** | – | |
+| Water Level 3 | **26** | – | |
+| Water Level 4 | **27** | – | |
 | Water Level 5 | **14** | – | |
-| Water Ground | **17** | – | |
-| Pump Control | **18** | – | PWM via MOSFET |
+| Water Ground | **32** | – | Analog reference probe |
+| Pump Control | **15** | – | PWM via MOSFET |
 | Battery ADC | **35** | ✅ ADC1 | Dedicated `_VBAT` pin on D32 |
-| Buzzer | **19** | – | |
+| Buzzer | **23** | – | |
 | LED | **5** | – | Built-in LED on LOLIN D32 |
 | Button | **0** | – | Also BOOT button on board |
-| I2C SDA | **21** | – | For optional MPU6500 |
-| I2C SCL | **22** | – | |
+| MPU INT | **13** | – | Optional motion module |
 
-### ESP32 DevKit / LOLIN32 v1.0.0 – Original Pin Mapping
+### ESP32 DevKit / LOLIN32 v1.0.0 – Original Flaura Mapping
 
 | Component | GPIO | Status |
 |-----------|------|--------|
-| Soil Sensor (ADC) | A0 (36) | ✅ |
-| Soil Sensor (VCC) | 4 | ✅ |
-| DHT11 Data | **2** | ⚠️ strapping pin – must be LOW at boot |
-| DHT11 Power | **5** | ✅ |
-| Water Level 1 | **12** | ⚠️ strapping pin – must be LOW at boot |
-| Water Level 2 | 13 | ✅ |
-| Water Level 3 | 14 | ✅ |
-| Water Level 4 | **15** | ⚠️ strapping pin – must be HIGH at boot |
-| Water Level 5 | 16 | ✅ |
-| Water Ground | 17 | ✅ |
-| Pump Control | 18 | ✅ |
-| Battery ADC | A3 (39) | ✅ |
-| Buzzer | 19 | ✅ |
-| LED | **21** | ⚠️ shared with I2C SDA |
-| Button | 0 | ✅ |
-| I2C SDA | 21 | ⚠️ shared with LED |
-| I2C SCL | 22 | ✅ |
+| Soil Sensor (ADC) | **33** | ✅ |
+| Soil Sensor (VCC) | **19** | ✅ |
+| Water Level 1 (100%) | **13** | ✅ |
+| Water Level 2 (75%) | **14** | ✅ |
+| Water Level 3 (50%) | **27** | ✅ |
+| Water Level 4 (25%) | **26** | ✅ |
+| Water Level 5 (10%) | **25** | ✅ |
+| Water Ground Probe | **35** | ✅ ADC input |
+| Pump Control | **23** | ✅ |
+| Battery ADC | **32** | ✅ |
+| Button | **0** | ✅ |
+| DHT11 | **disabled** | not used in this profile |
+| MPU INT | **disabled** | not used in this profile |
+| Buzzer | **disabled** | not used in this profile |
+| LED status | **disabled** | not used in this profile |
 
 > **Note:** All IO pins run at **3.3 V**. Do not connect 5 V signals directly.
 
@@ -149,8 +142,8 @@ Two separate pin profiles are maintained in `include/pins.h` and selected at com
    # LOLIN D32 (recommended)
    pio run -e lolin_d32 --target upload
 
-   # Generic ESP32 DevKit
-   pio run -e esp32dev --target upload
+   # LOLIN32 v1.0.0 (original Flaura mapping)
+   pio run -e lolin32 --target upload
    ```
 
 ### 3. Initial Configuration

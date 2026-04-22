@@ -67,18 +67,22 @@ void environmentSensorSetup() {
 }
 
 bool environmentSensorRead(float &temperature, float &humidity) {
-    // Sprawdź, czy piny są poprawnie skonfigurowane i obiekt istnieje
-    if (dhtPowerPin == 255 || dhtDataPin == 255 || dht_sensor == nullptr) {
-        if(dht_sensor == nullptr && dhtPowerPin != 255 && dhtDataPin != 255) {
-             // Spróbuj utworzyć obiekt ponownie, jeśli go nie ma, a piny są ok
-             dht_sensor = new DHT(dhtDataPin, DHTTYPE);
-             if(dht_sensor == nullptr) {
-                Serial.println("  [DHT11 Read] BŁĄD: Alokacja pamięci dla DHT nieudana.");
-                temperature = NAN; humidity = NAN; return false;
-             }
-        } else {
-            Serial.println("  [DHT11 Read] BŁĄD: Sensor nie jest gotowy (brak obiektu lub błędna konfiguracja pinów).");
-            temperature = NAN; humidity = NAN; return false;
+    // Sensor opcjonalny: dla profilu bez DHT po prostu zwracamy brak odczytu.
+    if (dhtPowerPin == 255 || dhtDataPin == 255) {
+        temperature = NAN;
+        humidity = NAN;
+        return false;
+    }
+
+    // Sprawdź, czy obiekt istnieje
+    if (dht_sensor == nullptr) {
+        // Spróbuj utworzyć obiekt ponownie, jeśli piny są poprawne
+        dht_sensor = new DHT(dhtDataPin, DHTTYPE);
+        if (dht_sensor == nullptr) {
+            Serial.println("  [DHT11 Read] BŁĄD: Alokacja pamięci dla DHT nieudana.");
+            temperature = NAN;
+            humidity = NAN;
+            return false;
         }
     }
 

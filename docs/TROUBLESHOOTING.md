@@ -2,6 +2,10 @@
 
 Common issues and solutions for Flora Smart Pot.
 
+> **Ważne:** ten projekt ma dwa profile pinów (`lolin32` i `lolin_d32`).
+> Zawsze sprawdzaj aktualną mapę pinów w `README.md` i `docs/HARDWARE_GUIDE.md`
+> zanim zastosujesz kroki z numerami GPIO.
+
 ## 🚨 Quick Diagnostics
 
 ### System Status Check
@@ -34,8 +38,7 @@ Common issues and solutions for Flora Smart Pot.
 2. **Check Boot Configuration**
    ```
    - GPIO 0 should be HIGH during boot
-   - GPIO 2 should be floating or HIGH
-   - Remove any loads on boot pins
+   - Remove temporary loads from strapping pins during flashing
    ```
 
 3. **Verify Connections**
@@ -52,8 +55,8 @@ Common issues and solutions for Flora Smart Pot.
 **Problem: Always reads 0% or 100%**
 ```
 Solutions:
-1. Check sensor power (GPIO 4 should go HIGH before reading)
-2. Verify ADC pin connection (GPIO 36)
+1. Check soil sensor power pin for your board profile (`lolin32` or `lolin_d32`)
+2. Verify soil ADC signal pin for your board profile
 3. Calibrate sensor in dry and wet conditions
 4. Replace sensor if physically damaged
 ```
@@ -69,10 +72,12 @@ Solutions:
 
 #### DHT11 Temperature/Humidity
 
+> Dotyczy tylko profilu `lolin_d32` (w `lolin32` DHT jest domyślnie wyłączony).
+
 **Problem: Always returns NaN**
 ```
 Solutions:
-1. Check data pin connection (GPIO 2)
+1. Check data pin connection according to `lolin_d32` mapping
 2. Verify 4.7kΩ pull-up resistor on data line
 3. Ensure sensor power is stable 3.3V
 4. Try different DHT11 sensor
@@ -93,8 +98,8 @@ Solutions:
 **Problem: No levels detected**
 ```
 Solutions:
-1. Check all level pin connections (GPIO 12-16)
-2. Verify ground pin connection (GPIO 17)
+1. Check all level pin connections for your board profile
+2. Verify water probe ground/reference pin for your board profile
 3. Ensure pull-up resistors (10kΩ) on level pins
 4. Test with multimeter - should read 3.3V when dry
 5. Clean sensor contacts
@@ -128,7 +133,7 @@ Solutions:
 ```
 Solutions:
 1. Check 12V power supply to pump
-2. Verify MOSFET/relay operation (GPIO 18)
+2. Verify MOSFET/relay operation on the configured pump GPIO for your profile
 3. Test pump directly with 12V
 4. Check for pump blockage or damage
 5. Verify PWM signal with oscilloscope
@@ -147,9 +152,10 @@ Solutions:
 #### Buzzer
 
 **Problem: No sound from buzzer**
+> Dotyczy tylko profilu `lolin_d32` (w `lolin32` buzzer jest domyślnie wyłączony).
 ```
 Solutions:
-1. Check buzzer connection (GPIO 19)
+1. Check buzzer connection on the configured buzzer GPIO (`lolin_d32`)
 2. Verify buzzer type (active vs passive)
 3. Test with direct 3.3V connection
 4. Check if alarm sound is enabled in config
@@ -161,10 +167,10 @@ Solutions:
 **Problem: LED not working**
 ```
 Solutions:
-1. Check LED polarity (anode to GPIO 21 via resistor)
+1. Check LED polarity (for `lolin_d32`: anode to configured LED pin via resistor)
 2. Verify current limiting resistor (220Ω)
 3. Test LED with direct connection
-4. Check GPIO 21 output with multimeter
+4. Check configured LED GPIO output with multimeter
 5. Replace LED if burned out
 ```
 
