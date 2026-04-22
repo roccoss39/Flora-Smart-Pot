@@ -160,8 +160,8 @@ Two separate pin profiles are maintained in `src/DeviceConfig.cpp` and selected 
 ### Sensor Calibration
 
 - **Soil Sensor** – hold the button to trigger dry/wet calibration sequence.
-- **Water Level** – adjust thresholds in `include/config.h`.
-- **Battery** – set low-voltage warning level in `include/config.h`.
+- **Water Level** – adjust threshold via runtime config (Blynk/app), persisted by `DeviceConfig`.
+- **Battery** – adjust low-voltage warning via runtime config (Blynk/app), persisted by `DeviceConfig`.
 
 ### Blynk Setup
 
@@ -219,20 +219,23 @@ Alarms also trigger: LED indication, Blynk notification, automatic pump activati
 
 ### Project Structure
 
-```
+``` 
 ├── include/
-│   ├── config.h          # Thresholds, timings
-│   ├── pins.h            # Board-specific pin definitions
-│   └── secrets.h         # WiFi + Blynk credentials (not committed)
+│   ├── DeviceConfig.h    # Runtime config API (pins, thresholds, preferences)
+│   ├── secrets.h         # WiFi + Blynk credentials (local, not committed)
+│   └── *.h               # Sensor/module headers
 ├── src/
 │   ├── main.cpp
+│   ├── DeviceConfig.cpp  # Board profiles + persisted settings
 │   ├── SoilSensor.*
 │   ├── WaterLevelSensor.*
 │   ├── PumpControl.*
 │   ├── AlarmManager.*
 │   ├── BlynkManager.*
 │   └── PowerManager.*
-├── lib/                  # Local libraries
+├── mobile_app/           # Flutter companion app
+├── mobile_backend/       # Optional backend for telemetry/API
+├── docs/
 ├── platformio.ini
 └── README.md
 ```
