@@ -1,0 +1,37 @@
+workflows:
+  ios-unsigned-build:
+    name: Flora iOS Unsigned Build (Free)
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - supla_secrets # Pobiera tokeny z panelu Codemagic
+    scripts:
+      - name: Wygenerowanie pliku .env
+        script: |
+          cd mobile_app
+          echo "SUPLA_BASE_URL=$SUPLA_BASE_URL" >> .env
+          echo "SUPLA_BEARER_TOKEN=$SUPLA_BEARER_TOKEN" >> .env
+          echo "SUPLA_DEVICE_ID=$SUPLA_DEVICE_ID" >> .env
+      
+      - name: Pobranie paczek Fluttera
+        script: |
+          cd mobile_app
+          flutter pub get
+      
+      - name: Budowanie aplikacji iOS bez certyfikatów (No Code Signing)
+        script: |
+          cd mobile_app
+          flutter build ios --release --no-codesign
+      
+      - name: Pakowanie do formatu .ipa
+        script: |
+          cd mobile_app/build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -q -r -X FloraApp.ipa Payload
+
+    artifacts:
+      - mobile_app/build/ios/iphoneos/FloraApp.ipa
