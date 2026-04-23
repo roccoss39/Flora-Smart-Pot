@@ -23,7 +23,7 @@ void backendTasksSetup() {
 void fetchAndApplyConfiguration() {
     // --- NOWY STOPER (np. co 15 sekund) ---
     static unsigned long lastConfigCheckTime = 0;
-    const unsigned long CONFIG_CHECK_INTERVAL_MS = 15000; 
+    const unsigned long CONFIG_CHECK_INTERVAL_MS = 2000;
 
     // Omijamy stoper, jeśli to pierwsze uruchomienie (lastConfigCheckTime == 0)
     if (lastConfigCheckTime != 0 && (millis() - lastConfigCheckTime < CONFIG_CHECK_INTERVAL_MS)) {
@@ -54,6 +54,7 @@ void fetchAndApplyConfiguration() {
             // 1. Tryb ciągły
             if (doc.containsKey("continuousMode")) {
                 bool serverVal = doc["continuousMode"].as<bool>();
+               // Serial.printf("[Debug] Pobrałem z serwera continuousMode: %s\n", serverVal ? "TAK" : "NIE");
                 if (serverVal != configIsContinuousMode()) {
                     configSetContinuousMode(serverVal);
                     Serial.printf("[Backend] -> Zmieniono Tryb Ciągły na: %s\n", serverVal ? "TAK" : "NIE");

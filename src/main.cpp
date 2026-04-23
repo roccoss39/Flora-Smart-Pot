@@ -203,6 +203,7 @@
      // Network handling
      if (WiFi.status() == WL_CONNECTED) {
          // WiFi connected; cloud handling moved out of main (Blynk disabled here)
+         fetchAndApplyConfiguration();
          fetchAndExecuteCommands(g_latestSensorData.waterLevel);
      } else if (!alarmManagerIsAlarmActive() && !pumpControlIsRunning()) {
          Serial.println(F("Brak aktywnego alarmu oraz połączenia z siecią - włączam tryb uśpienia"));
@@ -227,7 +228,7 @@
              powerManagerGoToDeepSleep();
          }
      }
-     
+        
      // Aktualizacja stanu alarmu
      bool alarmStateChanged = alarmManagerUpdate(
          g_latestSensorData.waterLevel, 
