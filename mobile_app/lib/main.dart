@@ -13,11 +13,16 @@ Future<void> main() async {
   // 2. Ładujemy nasz bezpieczny plik .env
   await dotenv.load(fileName: ".env");
 
-  // 3. Wyciągamy zmienne. Używamy ?? (fallback), na wypadek gdybyś
-  // kiedyś zapomniał dodać plik .env na nowym komputerze.
-  final suplaBaseUrl = dotenv.env['SUPLA_BASE_URL'] ?? 'http://192.168.0.68:8080';
-  final bearerToken = dotenv.env['SUPLA_BEARER_TOKEN'] ?? 'replace_me';
-  final deviceId = dotenv.env['SUPLA_DEVICE_ID'] ?? 'flora-1';
+// Sprawdzamy czy wartość istnieje I czy nie jest pustym tekstem
+String getEnv(String key, String defaultValue) {
+  final val = dotenv.env[key];
+  if (val == null || val.isEmpty) return defaultValue;
+  return val;
+}
+
+final suplaBaseUrl = getEnv('SUPLA_BASE_URL', 'http://192.168.0.68:8080');
+final bearerToken = getEnv('SUPLA_BEARER_TOKEN', 'replace_me');
+final deviceId = getEnv('SUPLA_DEVICE_ID', 'flora-1');
 
   final repository = PotRepository(
     apiClient: SuplaApiClient(
