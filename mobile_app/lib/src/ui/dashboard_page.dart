@@ -111,12 +111,16 @@ class _DashboardPageState extends State<DashboardPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _ErrorView(message: _error!, onRetry: _loadAll)
-              : _DashboardContent(
-                  snapshot: _snapshot,
-                  config: _config,
-                  isSaving: _saving,
-                  onTriggerPump: _triggerPump,
-                  onConfigChanged: _saveConfig,
+              // Dodany Pull-to-Refresh
+              : RefreshIndicator(
+                  onRefresh: _loadAll,
+                  child: _DashboardContent(
+                    snapshot: _snapshot,
+                    config: _config,
+                    isSaving: _saving,
+                    onTriggerPump: _triggerPump,
+                    onConfigChanged: _saveConfig,
+                  ),
                 ),
     );
   }
@@ -140,11 +144,21 @@ class _DashboardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (snapshot == null || config == null) {
-      return const Center(child: Text('Brak danych.'));
+      return ListView(
+        children: const [
+           Center(child: Padding(
+             padding: EdgeInsets.all(32.0),
+             child: Text('Brak danych.'),
+           ))
+        ],
+      );
     }
 
     final s = snapshot!;
     final c = config!;
+
+    // Przeliczenie ms na sekundy do wyświetlenia na przycisku
+    final pumpSecondsStr = (c.pumpDurationMs / 1000).toStringAsFixed(1);
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -169,76 +183,86 @@ class _DashboardContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Sterowanie (odpowiednik Blynk)', style: Theme.of(context).textTheme.titleMedium),
+                Text('Sterowanie', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 10),
                 FilledButton.icon(
                   onPressed: isSaving ? null : onTriggerPump,
                   icon: const Icon(Icons.play_arrow),
-                  label: Text('Uruchom pompę (${c.pumpDurationMs} ms)'),
+                  label: Text('Uruchom pompę ($pumpSecondsStr s)'),
                 ),
                 const SizedBox(height: 8),
                 _intSlider(
                   context,
-                  label: 'Czas pracy pompy (ms)',
+                  label: 'Czas pracy pompy',
                   value: c.pumpDurationMs,
                   min: 500,
                   max: 30000,
+                  // Formatter zamienia 5000 na '5.0 s'
+                  valueFormatter: (v) => '${(v / 1000).toStringAsFixed(1)} s',
                   onChanged: (v) => onConfigChanged(c.copyWith(pumpDurationMs: v)),
                 ),
                 _intSlider(
                   context,
-                  label: 'Próg wilgotności gleby (%)',
+                  label: 'Próg wilgotności gleby',
                   value: c.soilThresholdPercent,
                   min: 0,
                   max: 100,
+                  valueFormatter: (v) => '$v %',
                   onChanged: (v) => onConfigChanged(c.copyWith(soilThresholdPercent: v)),
                 ),
                 _intSlider(
                   context,
-                  label: 'Próg baterii (mV)',
+                  label: 'Próg baterii',
                   value: c.lowBatteryMilliVolts,
                   min: 2500,
                   max: 4200,
+                  // Formatter zamienia 3200mV na '3.20 V'
+                  valueFormatter: (v) => '${(v / 1000).toStringAsFixed(2)} V',
                   onChanged: (v) => onConfigChanged(c.copyWith(lowBatteryMilliVolts: v)),
                 ),
                 _intSlider(
                   context,
-                  label: 'Próg alarmu wilg. gleby (%)',
+                  label: 'Próg alarmu wilg. gleby',
                   value: c.lowSoilPercent,
                   min: 0,
                   max: 100,
+                  valueFormatter: (v) => '$v %',
                   onChanged: (v) => onConfigChanged(c.copyWith(lowSoilPercent: v)),
                 ),
                 _intSlider(
                   context,
-                  label: 'Próg poziomu wody (ADC)',
+                  label: 'Próg poziomu wody',
                   value: c.waterLevelThreshold,
                   min: 0,
                   max: 4095,
+                  valueFormatter: (v) => '$v ADC',
                   onChanged: (v) => onConfigChanged(c.copyWith(waterLevelThreshold: v)),
                 ),
                 _intSlider(
                   context,
-                  label: 'Kalibracja gleby sucho (ADC)',
+                  label: 'Kalibracja gleby sucho',
                   value: c.soilDryAdc,
                   min: 0,
                   max: 4095,
+                  valueFormatter: (v) => '$v ADC',
                   onChanged: (v) => onConfigChanged(c.copyWith(soilDryAdc: v)),
                 ),
                 _intSlider(
                   context,
-                  label: 'Kalibracja gleby mokro (ADC)',
+                  label: 'Kalibracja gleby mokro',
                   value: c.soilWetAdc,
                   min: 0,
                   max: 4095,
+                  valueFormatter: (v) => '$v ADC',
                   onChanged: (v) => onConfigChanged(c.copyWith(soilWetAdc: v)),
                 ),
                 _intSlider(
                   context,
-                  label: 'Moc pompy (%)',
+                  label: 'Moc pompy',
                   value: c.pumpPowerPercent,
                   min: 0,
                   max: 100,
+                  valueFormatter: (v) => '$v %',
                   onChanged: (v) => onConfigChanged(c.copyWith(pumpPowerPercent: v)),
                 ),
                 SwitchListTile(
@@ -278,6 +302,7 @@ class _DashboardContent extends StatelessWidget {
     );
   }
 
+  // Zaktualizowany widget suwaka wspierający formatowanie wartości
   Widget _intSlider(
     BuildContext context, {
     required String label,
@@ -285,17 +310,21 @@ class _DashboardContent extends StatelessWidget {
     required int min,
     required int max,
     required ValueChanged<int> onChanged,
+    String Function(int)? valueFormatter,
   }) {
+    // Używamy formatera, jeśli został przekazany, inaczej po prostu wyświetlamy wartość
+    final displayValue = valueFormatter != null ? valueFormatter(value) : '$value';
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('$label: $value'),
+        Text('$label: $displayValue', style: const TextStyle(fontWeight: FontWeight.w500)),
         Slider(
           value: value.toDouble().clamp(min.toDouble(), max.toDouble()),
           min: min.toDouble(),
           max: max.toDouble(),
           divisions: (max - min).clamp(1, 200),
-          label: '$value',
+          label: displayValue,
           onChanged: isSaving ? null : (v) => onChanged(v.round()),
         ),
       ],

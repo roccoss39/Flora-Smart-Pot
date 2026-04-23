@@ -32,8 +32,10 @@
  #include "AlarmManager.h"
  #include "ButtonManager.h"
  #include "LedManager.h"
+ #include "BackendTasks.h"
  #include <Preferences.h>
  #include "test.h"  
+ 
 
  // Configuration constants
 
@@ -80,11 +82,6 @@
      bool g_isMeasuring = false;
      bool g_isConnectingWifi = false;
  }
- 
- // Zmienne do śledzenia czasu i komend
-static unsigned long g_lastCommandCheckTime = 0;
-int g_lastCommandId = 0;
-const unsigned long COMMAND_CHECK_INTERVAL_MS = 1000; 
 
  // Function declarations
  SensorData performMeasurement();
@@ -96,17 +93,15 @@ const unsigned long COMMAND_CHECK_INTERVAL_MS = 1000;
  void setMeasuringStatus(bool isActive);
  void setConnectingWifiStatus(bool isActive);
  bool backendSendTelemetry(const SensorData& data);
- void fetchAndExecuteCommands();
+
  /**
   * @brief Device configuration at startup
   */
  void setup() {
      Serial.begin(115200);
      delay(100);
-     g_lastCommandId = configGetLastCommandId();
-     Serial.printf("System start. Ostatnie ID komendy z Flash: %d\n", g_lastCommandId);
-
-     clearPreferencesData("flaura_cfg_1"); // comment in normal mode
+   
+     //clearPreferencesData("flaura_cfg_1"); // comment in normal mode
      Serial.println(F("\n--- Flora Smart Pot - Main Start ---"));
      print_wakeup_reason();
     
@@ -116,6 +111,8 @@ const unsigned long COMMAND_CHECK_INTERVAL_MS = 1000;
      
      // Load configuration
      configSetup();
+
+     backendTasksSetup();
 
      testPrintConfig();
 
@@ -155,19 +152,28 @@ const unsigned long COMMAND_CHECK_INTERVAL_MS = 1000;
      // Operations after WiFi connection attempt
      if (wifiConnected) {
          Serial.println(F("Połączenie WiFi aktywne (Blynk wyłączony w main)."));
+         
+         // 1. Najpierw wysyłamy obecny stan czujników
          backendSendTelemetry(g_latestSensorData);
+         
+         // 2. NOWOŚĆ: Pobieramy ustawienia z apki (Tryb ciągły, czas pompy itd.)!
+         // To nadpisze stare ustawienia w pamięci Flash.
+         fetchAndApplyConfiguration(); 
+         
      } else {
          Serial.println(F("Pomijam wysyłkę pierwszych danych - brak połączenia WiFi."));         
      }
      
      g_lastMeasurementTime = millis();
 
-     fetchAndExecuteCommands();
-     
+     // 3. Sprawdzamy ręczne komendy (np. "Podlej teraz")
+     fetchAndExecuteCommands(g_latestSensorData.waterLevel);
+
      // Kontrola pompy na podstawie pierwszego pomiaru
      pumpControlActivateIfNeeded(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel);
  
      // Decision about operation mode (active/sleep)
+     // UWAGA: configIsContinuousMode() teraz zwróci świeżutką wartość, którą pobraliśmy 20 linijek wyżej!
      const bool shouldSleep = !configIsContinuousMode() && 
                              !alarmManagerIsAlarmActive() && 
                              !pumpControlIsRunning();
@@ -184,6 +190,7 @@ const unsigned long COMMAND_CHECK_INTERVAL_MS = 1000;
          }
      }
  }
+
  
  /**
   * @brief Main program loop
@@ -196,7 +203,7 @@ const unsigned long COMMAND_CHECK_INTERVAL_MS = 1000;
      // Network handling
      if (WiFi.status() == WL_CONNECTED) {
          // WiFi connected; cloud handling moved out of main (Blynk disabled here)
-         fetchAndExecuteCommands();
+         fetchAndExecuteCommands(g_latestSensorData.waterLevel);
      } else if (!alarmManagerIsAlarmActive() && !pumpControlIsRunning()) {
          Serial.println(F("Brak aktywnego alarmu oraz połączenia z siecią - włączam tryb uśpienia"));
          ledManagerTurnOff();
@@ -502,62 +509,3 @@ bool backendSendTelemetry(const SensorData& data) {
          ledManagerSetState(LED_OFF);  // Normalny stan
      }
  }
-
- void fetchAndExecuteCommands() {
-    static bool firstCheckDone = false; // Zapamiętuje, czy zrobiliśmy już pierwszy darmowy strzał
-
-    // Jeśli to pierwsze sprawdzenie LUB minęły 2 sekundy -> pobieraj
-    if (!firstCheckDone || (millis() - g_lastCommandCheckTime >= COMMAND_CHECK_INTERVAL_MS)) {
-        g_lastCommandCheckTime = millis();
-        firstCheckDone = true;
-    } else {
-        return; // W przeciwnym razie przerwij i czekaj
-    }
-
-    if (WiFi.status() != WL_CONNECTED) {
-        return; 
-    }
-
-    HTTPClient http;
-    // Budujemy adres: http://192.168.x.x:8080/api/flora/flora-1/commands?after_id=X
-    String url = String(FLORA_BACKEND_BASE_URL) + "/api/flora/" + FLORA_BACKEND_DEVICE_ID + "/commands?after_id=" + String(g_lastCommandId);
-    
-    http.begin(url);
-    http.setTimeout(2000); // Szybki timeout
-    http.addHeader("Authorization", String("Bearer ") + FLORA_BACKEND_TOKEN);
-
-    int httpCode = http.GET();
-    if (httpCode >= 200 && httpCode < 300) {
-        String payload = http.getString();
-        
-        // Dekodujemy JSON-a
-        DynamicJsonDocument doc(4096);
-        DeserializationError error = deserializeJson(doc, payload);
-
-        if (!error) {
-            JsonArray items = doc["items"];
-            for (JsonObject item : items) {
-                int currentId = item["id"].as<int>(); 
-                String type = item["type"].as<String>();
-
-                // Jeśli serwer kazał włączyć pompę:
-                if (type == "pump") {
-                    int durationMs = item["payload"]["durationMs"];
-                    Serial.printf("[Backend] Wykryto komendę PUMP! Czas: %d ms\n", durationMs);
-                    pumpControlManualTurnOn(durationMs);
-                    Serial.printf("Current ID:%d , lastcom:%d", currentId, g_lastCommandId);
-                }
-
-                // Zapisujemy ID, żeby nie wykonać tej samej komendy dwa razy
-                if (currentId > g_lastCommandId) {
-                    g_lastCommandId = currentId;
-                    configSetLastCommandId(g_lastCommandId); // Zapis do Flash!
-                }
-            }
-        } else {
-            Serial.println("[Backend] Błąd odczytu JSON-a z komendami.");
-            Serial.println(error.c_str());
-        }
-    }
-    http.end();
-}

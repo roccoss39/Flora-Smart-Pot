@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Twój import .env
 
 import 'src/services/pot_repository.dart';
 import 'src/services/supla_api_client.dart';
 import 'src/ui/dashboard_page.dart';
 
-void main() {
-  const suplaBaseUrl = String.fromEnvironment('SUPLA_BASE_URL', defaultValue: 'https://example.com');
-  const bearerToken = String.fromEnvironment('SUPLA_BEARER_TOKEN', defaultValue: 'replace_me');
-  const deviceId = String.fromEnvironment('SUPLA_DEVICE_ID', defaultValue: 'flora-1');
+Future<void> main() async {
+  // 1. To jest BARDZO WAŻNE: mówi Flutterowi, żeby przygotował swoje
+  // silniki pod spodem, zanim zaczniemy wczytywać pliki asynchronicznie.
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 2. Ładujemy nasz bezpieczny plik .env
+  await dotenv.load(fileName: ".env");
+
+  // 3. Wyciągamy zmienne. Używamy ?? (fallback), na wypadek gdybyś
+  // kiedyś zapomniał dodać plik .env na nowym komputerze.
+  final suplaBaseUrl = dotenv.env['SUPLA_BASE_URL'] ?? 'http://192.168.0.68:8080';
+  final bearerToken = dotenv.env['SUPLA_BEARER_TOKEN'] ?? 'replace_me';
+  final deviceId = dotenv.env['SUPLA_DEVICE_ID'] ?? 'flora-1';
 
   final repository = PotRepository(
     apiClient: SuplaApiClient(

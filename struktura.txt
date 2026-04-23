@@ -1,0 +1,169 @@
+.
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── docs
+│   ├── API_REFERENCE.md
+│   ├── COMPARE_WITH_ORIGINAL_FLAURA.md
+│   ├── HARDWARE_GUIDE.md
+│   └── TROUBLESHOOTING.md
+├── esp32-tft(zapisWorkspace).code-workspace
+├── .gitattributes
+├── .gitignore
+├── include
+│   ├── AlarmManager.h
+│   ├── BackendTasks.h
+│   ├── BatteryMonitor.h
+│   ├── BlynkManager.h
+│   ├── ButtonManager.h
+│   ├── DeviceConfig.h
+│   ├── EnvironmentSensor.h
+│   ├── .gitignore
+│   ├── LedManager.h
+│   ├── MotionSensor.h
+│   ├── PowerManager.h
+│   ├── PumpControl.h
+│   ├── README
+│   ├── secrets.h
+│   ├── secrets.h.example
+│   ├── SoilSensor.h
+│   ├── test.h
+│   └── WaterLevelSensor.h
+├── lib
+│   └── README
+├── LICENSE
+├── mobile_app
+│   ├── analysis_options.yaml
+│   ├── android
+│   │   ├── app
+│   │   ├── build.gradle.kts
+│   │   ├── flora_supla_app_android.iml
+│   │   ├── .gitignore
+│   │   ├── .gradle
+│   │   ├── gradle
+│   │   ├── gradle.properties
+│   │   ├── gradlew
+│   │   ├── gradlew.bat
+│   │   ├── .kotlin
+│   │   ├── local.properties
+│   │   └── settings.gradle.kts
+│   ├── build
+│   │   ├── 1459bf64f4a596319e929d1ab57d33ad.cache.dill.track.dill
+│   │   ├── 99111e0c5b6228829e100ef67db14ea2.cache.dill.track.dill
+│   │   ├── app
+│   │   ├── .cxx
+│   │   ├── e8d428fe051334a592da4ddeb7562eea
+│   │   ├── flutter_assets
+│   │   ├── .last_build_id
+│   │   ├── linux
+│   │   ├── native_assets
+│   │   ├── native_hooks
+│   │   └── reports
+│   ├── .dart_tool
+│   │   ├── dartpad
+│   │   ├── flutter_build
+│   │   ├── package_config.json
+│   │   ├── package_graph.json
+│   │   └── version
+│   ├── flora_supla_app.iml
+│   ├── .gitignore
+│   ├── .idea
+│   │   ├── libraries
+│   │   ├── modules.xml
+│   │   ├── runConfigurations
+│   │   └── workspace.xml
+│   ├── ios
+│   │   ├── Flutter
+│   │   ├── .gitignore
+│   │   ├── Runner
+│   │   ├── RunnerTests
+│   │   ├── Runner.xcodeproj
+│   │   └── Runner.xcworkspace
+│   ├── lib
+│   │   ├── main.dart
+│   │   └── src
+│   ├── linux
+│   │   ├── CMakeLists.txt
+│   │   ├── flutter
+│   │   ├── .gitignore
+│   │   └── runner
+│   ├── macos
+│   │   ├── Flutter
+│   │   ├── .gitignore
+│   │   ├── Runner
+│   │   ├── RunnerTests
+│   │   ├── Runner.xcodeproj
+│   │   └── Runner.xcworkspace
+│   ├── .metadata
+│   ├── pubspec.lock
+│   ├── pubspec.yaml
+│   ├── README.md
+│   ├── test
+│   │   ├── smoke_test.dart
+│   │   └── widget_test.dart
+│   ├── .venv
+│   │   ├── bin
+│   │   ├── include
+│   │   ├── lib
+│   │   ├── lib64 -> lib
+│   │   └── pyvenv.cfg
+│   ├── web
+│   │   ├── favicon.png
+│   │   ├── icons
+│   │   ├── index.html
+│   │   └── manifest.json
+│   └── windows
+│       ├── CMakeLists.txt
+│       ├── flutter
+│       ├── .gitignore
+│       └── runner
+├── mobile_backend
+│   ├── app.py
+│   ├── flora_backend.db
+│   ├── README.md
+│   ├── requirements.txt
+│   └── .venv
+│       ├── bin
+│       ├── include
+│       ├── lib
+│       ├── lib64 -> lib
+│       └── pyvenv.cfg
+├── .pio
+│   ├── build
+│   │   ├── lolin32
+│   │   └── project.checksum
+│   └── libdeps
+│       ├── doxygen
+│       ├── esp32dev
+│       ├── lolin32
+│       ├── lolin32_test
+│       ├── lolin_d32
+│       ├── lolin_d32_test
+│       └── native
+├── platformio.ini
+├── README.md
+├── requirements.txt
+├── src
+│   ├── AlarmManager.cpp
+│   ├── BackendTasks.cpp
+│   ├── BatteryMonitor.cpp
+│   ├── BlynkManager.cpp
+│   ├── ButtonManager.cpp
+│   ├── DeviceConfig.cpp
+│   ├── EnvironmentSensor.cpp
+│   ├── LedManager.cpp
+│   ├── main.cpp
+│   ├── MotionSensor.cpp
+│   ├── MotionSensorMain.cpp
+│   ├── PowerManager.cpp
+│   ├── PumpControl.cpp
+│   ├── SoilSensor.cpp
+│   ├── test.cpp
+│   └── WaterLevelSensor.cpp
+├── struktura.txt
+├── VIDEO.mp4
+└── .vscode
+    ├── c_cpp_properties.json
+    ├── extensions.json
+    └── launch.json
+
+72 directories, 95 files

@@ -97,3 +97,8 @@ sudo systemctl enable flora-backend
 sudo systemctl start flora-backend
 sudo systemctl status flora-backend
 ```
+
+## skrot
+alias flora-start='cd ~/Documents/PlatformIO/Projects/Flora/mobile_backend && source .venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8080'
+
+Od teraz wystarczy, że wpiszesz w terminalu po prostu flora-start i wszystko ruszy samo!

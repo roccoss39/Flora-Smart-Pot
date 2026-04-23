@@ -149,4 +149,7 @@ void configSetLowSoilPercent(int percent);
  */
 bool configSetMeasurementTime(int hour, int minute);
 
+int configGetLastCommandId();
+void configSetLastCommandId(int id);
+
 #endif // DEVICECONFIG_H

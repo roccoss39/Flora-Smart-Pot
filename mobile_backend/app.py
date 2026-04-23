@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 APP_TITLE = "Flora Mobile Backend"
 DB_PATH = os.getenv("FLORA_DB_PATH", "./flora_backend.db")
-API_TOKEN = os.getenv("FLORA_API_TOKEN", "change-me-token")
+API_TOKEN = os.getenv("TOKEN_SUPLA", "change-me-token")
 
 
 class PlantSnapshot(BaseModel):

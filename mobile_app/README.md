@@ -13,10 +13,11 @@ Mapowanie bazuje na `src/BlynkManager.cpp`:
 ## Uruchomienie
 
 ```bash
-cd mobile_app
+cd mobile_app 
 flutter pub get
 flutter run
 ```
+cd /home/dawid/Documents/PlatformIO/Projects/Flora/mobile_app
 
 ## Konfiguracja SUPLA API
 
