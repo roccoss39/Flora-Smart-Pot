@@ -174,8 +174,11 @@ class _DashboardContent extends StatelessWidget {
             SizedBox(width: 280, child: MetricTile(label: 'Wilgotność gleby', value: '${s.soilMoisturePercent} %', icon: Icons.grass)),
             SizedBox(width: 280, child: MetricTile(label: 'Poziom wody', value: '${s.waterLevel}/5', icon: Icons.water_drop)),
             SizedBox(width: 280, child: MetricTile(label: 'Bateria', value: '${s.batteryVoltage.toStringAsFixed(2)} V', icon: Icons.battery_charging_full)),
-            SizedBox(width: 280, child: MetricTile(label: 'Temperatura', value: '${s.temperature.toStringAsFixed(1)} °C', icon: Icons.thermostat)),
-            SizedBox(width: 280, child: MetricTile(label: 'Wilgotność powietrza', value: '${s.humidity.toStringAsFixed(1)} %', icon: Icons.air)),
+            // --- TYMCZASOWO UKRYTE CZUJNIKI SRODOWISKOWE ---
+            // Odkomentuj poniższe dwie linijki (usuń '//'), gdy podepniesz czujnik
+            // SizedBox(width: 280, child: MetricTile(label: 'Temperatura', value: '${s.temperature.toStringAsFixed(1)} °C', icon: Icons.thermostat)),
+            // SizedBox(width: 280, child: MetricTile(label: 'Wilgotność powietrza', value: '${s.humidity.toStringAsFixed(1)} %', icon: Icons.air)),
+            // -----------------------------------------------
             SizedBox(width: 280, child: MetricTile(label: 'Pompa', value: s.pumpRunning ? 'WŁĄCZONA' : 'WYŁĄCZONA', icon: Icons.water, color: s.pumpRunning ? Colors.green : null)),
             SizedBox(width: 280, child: MetricTile(label: 'Alarm', value: s.alarmActive ? 'AKTYWNY' : 'BRAK', icon: Icons.warning_amber, color: s.alarmActive ? Colors.red : Colors.green)),
           ],
