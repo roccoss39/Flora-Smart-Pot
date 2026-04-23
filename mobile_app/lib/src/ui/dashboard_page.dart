@@ -27,11 +27,14 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadAll();
   }
 
-  Future<void> _loadAll() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadAll({bool silent = false}) async {
+    // Jeśli nie jesteśmy w trybie cichym, pokaż kółko na środku ekranu
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final snapshot = await widget.repository.getSnapshot();
@@ -76,13 +79,16 @@ class _DashboardPageState extends State<DashboardPage> {
     if (config == null) return;
 
     setState(() {
-      _saving = true;
+      _saving = true; // Przycisk pompy zrobi się szary (zablokowany)
       _error = null;
     });
 
     try {
       await widget.repository.runPump(config.pumpDurationMs);
-      await _loadAll();
+      
+      // ZMIANA TUTAJ: Pobieramy dane w tle, bez resetowania scrolla!
+      await _loadAll(silent: true); 
+      
       if (!mounted) return;
       setState(() => _saving = false);
     } catch (e) {
@@ -111,9 +117,8 @@ class _DashboardPageState extends State<DashboardPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _ErrorView(message: _error!, onRetry: _loadAll)
-              // Dodany Pull-to-Refresh
               : RefreshIndicator(
-                  onRefresh: _loadAll,
+                  onRefresh: () => _loadAll(silent: true),
                   child: _DashboardContent(
                     snapshot: _snapshot,
                     config: _config,
@@ -146,10 +151,10 @@ class _DashboardContent extends StatelessWidget {
     if (snapshot == null || config == null) {
       return ListView(
         children: const [
-           Center(child: Padding(
-             padding: EdgeInsets.all(32.0),
-             child: Text('Brak danych.'),
-           ))
+          Center(child: Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Text('Brak danych.'),
+          ))
         ],
       );
     }
@@ -157,7 +162,6 @@ class _DashboardContent extends StatelessWidget {
     final s = snapshot!;
     final c = config!;
 
-    // Przeliczenie ms na sekundy do wyświetlenia na przycisku
     final pumpSecondsStr = (c.pumpDurationMs / 1000).toStringAsFixed(1);
 
     return ListView(
@@ -191,98 +195,99 @@ class _DashboardContent extends StatelessWidget {
                   label: Text('Uruchom pompę ($pumpSecondsStr s)'),
                 ),
                 const SizedBox(height: 8),
-                _intSlider(
-                  context,
+                
+                // Poniżej używamy naszego nowego, inteligentnego suwaka:
+                _SmartConfigSlider(
                   label: 'Czas pracy pompy',
                   value: c.pumpDurationMs,
                   min: 500,
                   max: 30000,
-                  // Formatter zamienia 5000 na '5.0 s'
+                  disabled: isSaving,
                   valueFormatter: (v) => '${(v / 1000).toStringAsFixed(1)} s',
-                  onChanged: (v) => onConfigChanged(c.copyWith(pumpDurationMs: v)),
+                  onSave: (v) => onConfigChanged(c.copyWith(pumpDurationMs: v)),
                 ),
-                _intSlider(
-                  context,
+                _SmartConfigSlider(
                   label: 'Próg wilgotności gleby',
                   value: c.soilThresholdPercent,
                   min: 0,
                   max: 100,
+                  disabled: isSaving,
                   valueFormatter: (v) => '$v %',
-                  onChanged: (v) => onConfigChanged(c.copyWith(soilThresholdPercent: v)),
+                  onSave: (v) => onConfigChanged(c.copyWith(soilThresholdPercent: v)),
                 ),
-                _intSlider(
-                  context,
+                _SmartConfigSlider(
                   label: 'Próg baterii',
                   value: c.lowBatteryMilliVolts,
                   min: 2500,
                   max: 4200,
-                  // Formatter zamienia 3200mV na '3.20 V'
+                  disabled: isSaving,
                   valueFormatter: (v) => '${(v / 1000).toStringAsFixed(2)} V',
-                  onChanged: (v) => onConfigChanged(c.copyWith(lowBatteryMilliVolts: v)),
+                  onSave: (v) => onConfigChanged(c.copyWith(lowBatteryMilliVolts: v)),
                 ),
-                _intSlider(
-                  context,
+                _SmartConfigSlider(
                   label: 'Próg alarmu wilg. gleby',
                   value: c.lowSoilPercent,
                   min: 0,
                   max: 100,
+                  disabled: isSaving,
                   valueFormatter: (v) => '$v %',
-                  onChanged: (v) => onConfigChanged(c.copyWith(lowSoilPercent: v)),
+                  onSave: (v) => onConfigChanged(c.copyWith(lowSoilPercent: v)),
                 ),
-                _intSlider(
-                  context,
+                _SmartConfigSlider(
                   label: 'Próg poziomu wody',
                   value: c.waterLevelThreshold,
                   min: 0,
                   max: 4095,
+                  disabled: isSaving,
                   valueFormatter: (v) => '$v ADC',
-                  onChanged: (v) => onConfigChanged(c.copyWith(waterLevelThreshold: v)),
+                  onSave: (v) => onConfigChanged(c.copyWith(waterLevelThreshold: v)),
                 ),
-                _intSlider(
-                  context,
+                _SmartConfigSlider(
                   label: 'Kalibracja gleby sucho',
                   value: c.soilDryAdc,
                   min: 0,
                   max: 4095,
+                  disabled: isSaving,
                   valueFormatter: (v) => '$v ADC',
-                  onChanged: (v) => onConfigChanged(c.copyWith(soilDryAdc: v)),
+                  onSave: (v) => onConfigChanged(c.copyWith(soilDryAdc: v)),
                 ),
-                _intSlider(
-                  context,
+                _SmartConfigSlider(
                   label: 'Kalibracja gleby mokro',
                   value: c.soilWetAdc,
                   min: 0,
                   max: 4095,
+                  disabled: isSaving,
                   valueFormatter: (v) => '$v ADC',
-                  onChanged: (v) => onConfigChanged(c.copyWith(soilWetAdc: v)),
+                  onSave: (v) => onConfigChanged(c.copyWith(soilWetAdc: v)),
                 ),
-                _intSlider(
-                  context,
+                _SmartConfigSlider(
                   label: 'Moc pompy',
                   value: c.pumpPowerPercent,
                   min: 0,
                   max: 100,
+                  disabled: isSaving,
                   valueFormatter: (v) => '$v %',
-                  onChanged: (v) => onConfigChanged(c.copyWith(pumpPowerPercent: v)),
+                  onSave: (v) => onConfigChanged(c.copyWith(pumpPowerPercent: v)),
                 ),
+                
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Tryb ciągły (bez Deep Sleep)'),
                   value: c.continuousMode,
-                  onChanged: (v) => onConfigChanged(c.copyWith(continuousMode: v)),
+                  onChanged: isSaving ? null : (v) => onConfigChanged(c.copyWith(continuousMode: v)),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Dźwięk alarmu'),
                   value: c.alarmSoundEnabled,
-                  onChanged: (v) => onConfigChanged(c.copyWith(alarmSoundEnabled: v)),
+                  onChanged: isSaving ? null : (v) => onConfigChanged(c.copyWith(alarmSoundEnabled: v)),
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Godzina pomiaru'),
                   subtitle: Text('${c.measurementHour.toString().padLeft(2, '0')}:${c.measurementMinute.toString().padLeft(2, '0')}'),
                   trailing: OutlinedButton(
-                    onPressed: () async {
+                    onPressed: isSaving ? null : () async {
                       final contextMounted = context.mounted;
                       final picked = await showTimePicker(
                         context: context,
@@ -301,31 +306,80 @@ class _DashboardContent extends StatelessWidget {
       ],
     );
   }
+}
 
-  // Zaktualizowany widget suwaka wspierający formatowanie wartości
-  Widget _intSlider(
-    BuildContext context, {
-    required String label,
-    required int value,
-    required int min,
-    required int max,
-    required ValueChanged<int> onChanged,
-    String Function(int)? valueFormatter,
-  }) {
-    // Używamy formatera, jeśli został przekazany, inaczej po prostu wyświetlamy wartość
-    final displayValue = valueFormatter != null ? valueFormatter(value) : '$value';
-    
+// ----------------------------------------------------------------------
+// OSOBNA KLASA: Inteligentny Suwak z wbudowanym stanem
+// ----------------------------------------------------------------------
+class _SmartConfigSlider extends StatefulWidget {
+  const _SmartConfigSlider({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onSave,
+    this.valueFormatter,
+    this.disabled = false,
+  });
+
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onSave;
+  final String Function(int)? valueFormatter;
+  final bool disabled;
+
+  @override
+  State<_SmartConfigSlider> createState() => _SmartConfigSliderState();
+}
+
+class _SmartConfigSliderState extends State<_SmartConfigSlider> {
+  late double _currentValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentValue = widget.value.toDouble();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SmartConfigSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      _currentValue = widget.value.toDouble();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = widget.valueFormatter != null 
+        ? widget.valueFormatter!(_currentValue.round()) 
+        : '${_currentValue.round()}';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('$label: $displayValue', style: const TextStyle(fontWeight: FontWeight.w500)),
+        Text('${widget.label}: $displayValue', style: const TextStyle(fontWeight: FontWeight.w500)),
         Slider(
-          value: value.toDouble().clamp(min.toDouble(), max.toDouble()),
-          min: min.toDouble(),
-          max: max.toDouble(),
-          divisions: (max - min).clamp(1, 200),
+          // Naprawiony błąd num vs double!
+          value: _currentValue.clamp(widget.min.toDouble(), widget.max.toDouble()).toDouble(),
+          min: widget.min.toDouble(),
+          max: widget.max.toDouble(),
+          divisions: (widget.max - widget.min).clamp(1, 200),
           label: displayValue,
-          onChanged: isSaving ? null : (v) => onChanged(v.round()),
+          onChanged: widget.disabled
+              ? null
+              : (v) {
+                  setState(() {
+                    _currentValue = v;
+                  });
+                },
+          onChangeEnd: widget.disabled
+              ? null
+              : (v) {
+                  widget.onSave(v.round());
+                },
         ),
       ],
     );

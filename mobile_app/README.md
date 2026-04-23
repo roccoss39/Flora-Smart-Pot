@@ -30,3 +30,6 @@ W `lib/main.dart` ustaw:
 ## Uwaga integracyjna
 
 SUPLA i Blynk mają inny model kanałów i akcji. Dlatego endpointy w `SuplaApiClient` są przygotowane jako **czytelny adapter**, który łatwo dopasujesz do swojego backendu SUPLA (lub własnego middleware pomiędzy SUPLA a aplikacją).
+
+## Instalacja na Readme 6 (najnowszej wersji)
+flutter run --release -d 0e4368e17d25
