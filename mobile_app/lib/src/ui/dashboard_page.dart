@@ -210,7 +210,7 @@ class _DashboardContent extends StatelessWidget {
                   onSave: (v) => onConfigChanged(c.copyWith(pumpDurationMs: v)),
                 ),
                 _SmartConfigSlider(
-                  label: 'Próg wilgotności gleby',
+                  label: 'Próg wilgotności gleby dla pracy pompy',
                   value: c.soilThresholdPercent,
                   min: 0,
                   max: 100,
@@ -219,7 +219,7 @@ class _DashboardContent extends StatelessWidget {
                   onSave: (v) => onConfigChanged(c.copyWith(soilThresholdPercent: v)),
                 ),
                 _SmartConfigSlider(
-                  label: 'Próg baterii',
+                  label: 'Próg baterii do alarmu',
                   value: c.lowBatteryMilliVolts,
                   min: 2500,
                   max: 4200,

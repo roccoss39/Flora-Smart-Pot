@@ -74,7 +74,8 @@ static const char* BOARD_NAME = "LOLIN32 v1.0.0";
 // Profil zgodny z oryginalnym projektem Flaura (Flaura_Blynk.ino):
 // bez DHT i bez MPU, z mapą pinów pod klasyczny zestaw czujników.
 const uint8_t  DEFAULT_SOIL_VCC_PIN                    = 19;
-const uint8_t  DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { 13, 14, 27, 26, 25 };
+//const uint8_t  DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { 13, 14, 27, 26, 25 };
+const uint8_t  DEFAULT_WL_PIN[NUM_WATER_LEVELS_CONFIG] = { 25, 26, 27, 14, 13 };
 const uint8_t  DEFAULT_WL_GROUND_PIN                   = 35;
 const uint8_t  DEFAULT_PUMP_PIN                        = 23;
 const uint8_t  DEFAULT_BAT_ADC_PIN                     = 32;

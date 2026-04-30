@@ -52,6 +52,8 @@ int waterLevelSensorReadLevel() {
         }
     }
 
+    // resultLevel = 1; // DEBUG
+    // Serial.printf(">> [DEBUG] Poziom wody: %d\n", resultLevel); // DEBUG
     Serial.printf(">> Poziom wody: %d\n", resultLevel);
     return resultLevel;
 }

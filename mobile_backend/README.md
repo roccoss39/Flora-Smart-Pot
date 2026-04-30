@@ -102,3 +102,6 @@ sudo systemctl status flora-backend
 alias flora-start='cd ~/Documents/PlatformIO/Projects/Flora/mobile_backend && source .venv/bin/activate && uvicorn app:app --host 0.0.0.0 --port 8080'
 
 Od teraz wystarczy, że wpiszesz w terminalu po prostu flora-start i wszystko ruszy samo!
+
+## dane z czujnikow
+curl -H "Authorization: Bearer $TOKEN_SUPLA" http://127.0.0.1:8080/api/flora/flora-1/snapshot

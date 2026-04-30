@@ -20,7 +20,7 @@ String getEnv(String key, String defaultValue) {
   return val;
 }
 
-final suplaBaseUrl = getEnv('SUPLA_BASE_URL', 'http://192.168.0.68:8080');
+final suplaBaseUrl = getEnv('SUPLA_BASE_URL', 'http://192.168.0.237:8080');//  'http://192.168.0.237:8080'
 final bearerToken = getEnv('SUPLA_BEARER_TOKEN', 'replace_me');
 final deviceId = getEnv('SUPLA_DEVICE_ID', 'flora-1');
 
