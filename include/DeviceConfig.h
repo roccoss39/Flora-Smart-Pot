@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // -----------------------------------------------------------------------------
-// Configuration initialization and cleanup
+// Inicjalizacja i czyszczenie konfiguracji
 // -----------------------------------------------------------------------------
 /**
  * @brief Loads (and creates default if needed) all settings from flash.
@@ -34,7 +34,7 @@ void clearPreferencesData(const char* namespaceToClear);
 
 
 // -----------------------------------------------------------------------------
-// Getters – general
+// Gettery – ogólne
 // -----------------------------------------------------------------------------
 /** Daily measurement time – hour (0–23) */
 int  configGetMeasurementHour();
@@ -47,7 +47,7 @@ uint32_t configGetSleepSeconds();
 uint8_t configGetLedPin();
 
 // -----------------------------------------------------------------------------
-// Getters – soil moisture sensor
+// Gettery – czujnik wilgotności gleby
 // -----------------------------------------------------------------------------
 /** Soil sensor ADC pin number */
 uint8_t configGetSoilPin();
@@ -62,7 +62,7 @@ int     configGetSoilThresholdPercent();
 
 
 // -----------------------------------------------------------------------------
-// Getters – water level sensor
+// Gettery – czujnik poziomu wody
 // -----------------------------------------------------------------------------
 /** Digital pin number for water level 1–5 */
 uint8_t  configGetWaterLevelPin(int level);
@@ -73,7 +73,7 @@ uint16_t configGetWaterLevelThreshold();
 
 
 // -----------------------------------------------------------------------------
-// Getters – pump
+// Gettery – pompa
 // -----------------------------------------------------------------------------
 /** Pump control pin number */
 uint8_t  configGetPumpPin();
@@ -84,7 +84,7 @@ uint8_t  configGetPumpDutyCycle();
 
 
 // -----------------------------------------------------------------------------
-// Getters – power and auxiliary sensors
+// Gettery – zasilanie i czujniki pomocnicze
 // -----------------------------------------------------------------------------
 /** Battery measurement ADC pin number */
 uint8_t  configGetBatteryAdcPin();
@@ -105,7 +105,7 @@ int      configGetLowSoilPercent();
 
 
 // -----------------------------------------------------------------------------
-// Setters – soil moisture sensor
+// Settery – czujnik wilgotności gleby
 // -----------------------------------------------------------------------------
 /** Sets saved "dry" ADC calibration */
 void configSetSoilDryADC(int value);
@@ -116,7 +116,7 @@ void configSetSoilThresholdPercent(int threshold);
 
 
 // -----------------------------------------------------------------------------
-// Setters – water level sensor
+// Settery – czujnik poziomu wody
 // -----------------------------------------------------------------------------
 /** Sets common water probe pin */
 void configSetWaterLevelGroundPin(uint8_t pin);
@@ -125,7 +125,7 @@ void configSetWaterLevelThreshold(uint16_t threshold);
 
 
 // -----------------------------------------------------------------------------
-// Setters – pump
+// Settery – pompa
 // -----------------------------------------------------------------------------
 /** Sets pump run time (ms) */
 void configSetPumpRunMillis(uint32_t durationMs);
@@ -134,7 +134,7 @@ void configSetPumpDutyCycle(uint8_t duty);
 
 
 // -----------------------------------------------------------------------------
-// Setters – alarm and Blynk
+// Settery – alarm i Blynk
 // -----------------------------------------------------------------------------
 /** Sets whether alarm sound is enabled */
 void configSetAlarmSoundEnabled(bool enabled);
