@@ -1,11 +1,11 @@
 /**
  * @file main.cpp
- * @brief Main program file for Flora Smart Pot
+ * @brief Główny plik programu dla Flora Smart Pot
  * @version 1.0
  * @date 2025-05-01
  * 
- * Program controlling smart plant pot with moisture monitoring
- * and irrigation management.
+ * Program sterujący inteligentną doniczką z monitorowaniem wilgotności
+ * i zarządzaniem nawadnianiem.
  */
 
  #include <Arduino.h>
@@ -21,7 +21,7 @@
  #include "secrets.h"
  #endif
  
- // System modules
+ // Moduły systemowe
  #include "DeviceConfig.h"
  #include "SoilSensor.h"
  #include "WaterLevelSensor.h"
@@ -36,12 +36,6 @@
  #include <Preferences.h>
  #include "test.h"  
  
-
- // Configuration constants
-
- constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 120;
- constexpr uint8_t WIFI_CONNECTION_TIMEOUT_SEC = 10;
-
  #ifndef FLORA_BACKEND_BASE_URL
  #define FLORA_BACKEND_BASE_URL "http://127.0.0.1:8080"
  #endif
@@ -54,9 +48,12 @@
  #define FLORA_BACKEND_DEVICE_ID "flora-1"
  #endif
  
+ constexpr uint16_t WEBPORTAL_TIMEOUT_SEC = 120;
+ constexpr uint8_t WIFI_CONNECTION_TIMEOUT_SEC = 10;
+
  /**
   * @struct SensorData
-  * @brief Structure storing data from all sensors
+  * @brief Struktura przechowująca dane ze wszystkich czujników
   */
  struct SensorData {
      int soilMoisture = -1;
@@ -67,15 +64,15 @@
      bool dhtOk = false;
      
      /**
-      * @brief Checks if data is valid
-      * @return true if basic data is available
+      * @brief Sprawdza, czy dane są poprawne
+      * @return true, jeśli podstawowe dane są dostępne
       */
      bool isValid() const {
          return soilMoisture >= 0 && waterLevel >= 0 && batteryVoltage > 0;
      }
  };
  
- // Local static variables
+ // Lokalne zmienne statyczne
  namespace {
      SensorData g_latestSensorData;
      unsigned long g_lastMeasurementTime = 0;
@@ -83,7 +80,7 @@
      bool g_isConnectingWifi = false;
  }
 
- // Function declarations
+ // Deklaracje funkcji
  SensorData performMeasurement();
  void displayMeasurements(const SensorData& data);
  void print_wakeup_reason();
@@ -95,29 +92,29 @@
  bool backendSendTelemetry(const SensorData& data);
 
  /**
-  * @brief Device configuration at startup
+  * @brief Konfiguracja urządzenia przy starcie
   */
  void setup() {
      Serial.begin(115200);
      delay(100);
    
-    //  clearPreferencesData("flaura_cfg_1"); // comment in normal mode
-    //  Serial.println(F("\n--- CLEARING PREFERENCES DATA ---")); // comment in normal mode
+    //  clearPreferencesData("flaura_cfg_1"); // zakomentuj w trybie normalnym
+    //  Serial.println(F("\n--- CLEARING PREFERENCES DATA ---")); // zakomentuj w trybie normalnym
      Serial.println(F("\n--- Flora Smart Pot - Main Start ---"));
      print_wakeup_reason();
     
-     // I2C initialization
+     // Inicjalizacja I2C
      Wire.begin();
      delay(100);
      
-     // Load configuration
+     // Załaduj konfigurację
      configSetup();
 
      backendTasksSetup();
 
      testPrintConfig();
 
-     // Module initialization
+     // Inicjalizacja modułów
      ledManagerSetup(configGetLedPin(), HIGH);
      soilSensorSetup();
      waterLevelSensorSetup();
@@ -144,20 +141,20 @@
          Serial.println(F("[SETUP] Wykryto aktywny alarm!"));
      }
  
-     // Display measurement results
+     // Wyświetl wyniki pomiarów
      displayMeasurements(g_latestSensorData);
  
      // Konfiguracja sieci WiFi
      bool wifiConnected = setupWiFiConnection();
      
-     // Operations after WiFi connection attempt
+     // Operacje po próbie połączenia WiFi
      if (wifiConnected) {
          Serial.println(F("Połączenie WiFi aktywne (Blynk wyłączony w main)."));
          
          // 1. Najpierw wysyłamy obecny stan czujników
          backendSendTelemetry(g_latestSensorData);
          
-         // 2. NOWOŚĆ: Pobieramy ustawienia z apki (Tryb ciągły, czas pompy itd.)!
+         // Pobieramy ustawienia z apki (Tryb ciągły, czas pompy itd.)!
          // To nadpisze stare ustawienia w pamięci Flash.
          fetchAndApplyConfiguration(); 
          
@@ -173,7 +170,7 @@
      // Kontrola pompy na podstawie pierwszego pomiaru
      pumpControlActivateIfNeeded(g_latestSensorData.soilMoisture, g_latestSensorData.waterLevel);
  
-     // Decision about operation mode (active/sleep)
+     // Decyzja o trybie pracy (aktywny/uśpienie)
      // UWAGA: configIsContinuousMode() teraz zwróci świeżutką wartość, którą pobraliśmy 20 linijek wyżej!
      const bool shouldSleep = !configIsContinuousMode() && 
                              !alarmManagerIsAlarmActive() && 
@@ -194,16 +191,16 @@
 
  
  /**
-  * @brief Main program loop
+  * @brief Główna pętla programu
   */
  void loop() {
-     // Update basic components
+     // Aktualizacja podstawowych komponentów
      ledManagerUpdate();
      pumpControlUpdate();
      
-     // Network handling
+     // Obsługa sieci
      if (WiFi.status() == WL_CONNECTED) {
-         // WiFi connected; cloud handling moved out of main (Blynk disabled here)
+         // WiFi połączone; obsługa chmury przeniesiona poza main (Blynk tutaj wyłączony)
          fetchAndApplyConfiguration();
          fetchAndExecuteCommands(g_latestSensorData.waterLevel);
      } else if (!alarmManagerIsAlarmActive() && !pumpControlIsRunning()) {
@@ -212,17 +209,17 @@
          configSetContinuousMode(false);
      }
  
-     // Handle measurement cycles in continuous mode
+     // Obsługa cykli pomiarowych w trybie ciągłym
      if (configIsContinuousMode()) {
          uint32_t interval = configGetBlynkSendIntervalSec() * 1000;
-         if (interval == 0) interval = 60000;  // Default interval 60s
+         if (interval == 0) interval = 60000;  // Domyślny interwał 60s
  
-         // Check if it's time for measurement
+         // Sprawdź, czy nadszedł czas na pomiar
          if ((millis() - g_lastMeasurementTime > interval) || buttonWasPressed()) {
              handleMeasurementCycle();
          }
      } else {
-         // Handle Deep Sleep mode
+         // Obsługa trybu Deep Sleep
          if (!pumpControlIsRunning() && !alarmManagerIsAlarmActive()) {
              Serial.println(F("[Loop] Pompa zakończyła pracę w trybie Deep Sleep, przechodzę do uśpienia..."));
              ledManagerTurnOff();
@@ -237,14 +234,14 @@
          g_latestSensorData.soilMoisture
      );
      
-     // Log alarm state change (cloud integration currently disabled in main)
+     // Zaloguj zmianę stanu alarmu (integracja z chmurą obecnie wyłączona w main)
      if (alarmStateChanged) {
          Serial.printf("[Loop] Zmiana stanu alarmu: %s\n", alarmManagerIsAlarmActive() ? "AKTYWNY" : "NIEAKTYWNY");
          backendSendTelemetry(g_latestSensorData);
      }
      
      updateLedBasedOnState();
-     delay(10);  // Small delay for loop stability
+     delay(10);  // Małe opóźnienie dla stabilności pętli
  }
  
  /**
@@ -301,10 +298,10 @@
   * @brief Wykonanie pełnego cyklu pomiarowego
   */
 void handleMeasurementCycle() {
-     // Read sensors
+     // Odczytaj czujniki
      g_latestSensorData = performMeasurement();
      
-     // Display results
+     // Wyświetl wyniki
      displayMeasurements(g_latestSensorData);
  
      backendSendTelemetry(g_latestSensorData);
@@ -379,16 +376,16 @@ bool backendSendTelemetry(const SensorData& data) {
  
      SensorData data;
  
-     // Soil moisture measurement
+     // Pomiar wilgotności gleby
      data.soilMoisture = soilSensorReadPercent();
      
      // Pomiar poziomu wody
      data.waterLevel = waterLevelSensorReadLevel();
      
-     // Battery voltage measurement
+     // Pomiar napięcia baterii
      data.batteryVoltage = batteryMonitorReadVoltage();
  
-     // Air temperature and humidity measurement
+     // Pomiar temperatury i wilgotności powietrza
      float tempDHT, humDHT;
      data.dhtOk = environmentSensorRead(tempDHT, humDHT);
      
@@ -416,7 +413,7 @@ bool backendSendTelemetry(const SensorData& data) {
      // Informacja o trybie pracy
      Serial.printf("  Tryb ciągły: %s (false = Deep Sleep)\n", configIsContinuousMode() ? "TAK" : "NIE");
      
-     // Display sensor data
+     // Wyświetl dane z czujników
      if (data.soilMoisture >= 0) {
          Serial.printf("  Wilgotność gleby: %d %%\n", data.soilMoisture);
      } else {
@@ -504,7 +501,7 @@ bool backendSendTelemetry(const SensorData& data) {
   */
  void updateLedBasedOnState() {
      if (g_isMeasuring || g_isConnectingWifi) {
-         ledManagerSetState(LED_ON);  // Priority: measurement/connecting
+         ledManagerSetState(LED_ON);  // Priorytet: pomiar/łączenie
      } else if (alarmManagerIsAlarmActive()) {
          ledManagerSetState(LED_BLINKING_FAST);  // Alarm
      } else {
