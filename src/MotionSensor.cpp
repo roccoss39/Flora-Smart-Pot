@@ -109,10 +109,10 @@ bool MotionSensor::isTilted(float threshold_degrees) {
 bool MotionSensor::setupWakeOnMotion(uint8_t threshold_mg_per_lsb) {
     Serial.println("Configuring Wake on Motion...");
 
-    // 1. Reset device (optional but recommended)
+    // 1. Reset urządzenia (opcjonalny, ale zalecany)
     // if (!writeRegister(PWR_MGMT_1, 0x80)) return false; // Reset
     // delay(100);
-    // // Wake up again
+    // // Wybudź ponownie
     // if (!writeRegister(PWR_MGMT_1, 0x00)) return false;
     // delay(100);
 
@@ -131,8 +131,8 @@ bool MotionSensor::setupWakeOnMotion(uint8_t threshold_mg_per_lsb) {
     if (!writeRegister(ACCEL_WOM_THR, threshold_mg_per_lsb)) return false;
 
     // Włącz funkcję Wake-on-Motion dla akcelerometru
-    // Ustaw bit ACCEL_INTEL_EN i ACCEL_INTEL_MODE (compare with previous sample)
-    if (!writeRegister(ACCEL_INTEL_CTRL, 0xC0)) return false; // Enable WoM logic, compare current sample to previous sample
+    // Ustaw bit ACCEL_INTEL_EN i ACCEL_INTEL_MODE (porównanie z poprzednią próbką)
+    if (!writeRegister(ACCEL_INTEL_CTRL, 0xC0)) return false; // Włącz logikę WoM, porównuj bieżącą próbkę z poprzednią
 
     // Skonfiguruj pin INT
     // Np. Active low, push-pull, latching until cleared
